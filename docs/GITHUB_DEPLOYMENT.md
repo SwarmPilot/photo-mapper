@@ -38,7 +38,8 @@ git commit -m "Initial commit: Photo Mapper v2.0 with automation"
 git remote add origin https://github.com/yourusername/photo-mapper.git
 
 # Push to GitHub
-git push -u origin main
+git push -u origin mainls
+
 ```
 
 #### **Repository Structure**
