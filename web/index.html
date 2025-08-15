@@ -1,0 +1,1803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Mapper - GPS Photo Locations</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --bg-color: #ffffff;
+            --text-color: #1f2937;
+            --border-color: #e5e7eb;
+            --header-bg: #f8fafc;
+            --success-color: #059669;
+            --error-color: #dc2626;
+            --warning-color: #d97706;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #111827;
+                --text-color: #f3f4f6;
+                --border-color: #374151;
+                --header-bg: #1f2937;
+            }
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            z-index: 1000;
+            position: relative;
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .status {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .status.loading {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        
+        .status.success {
+            background: #d1fae5;
+            color: var(--success-color);
+        }
+        
+        .status.error {
+            background: #fee2e2;
+            color: var(--error-color);
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            background: var(--bg-color);
+            color: var(--text-color);
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        
+        .btn:hover {
+            background: var(--header-bg);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: #1d4ed8;
+        }
+        
+        .config-panel {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            min-width: 300px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            z-index: 1001;
+        }
+        
+        .config-panel.show {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.25rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-size: 0.875rem;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }
+        
+        #map {
+            height: calc(100vh - 80px);
+            width: 100%;
+        }
+        
+        .popup-content {
+            max-width: 250px;
+        }
+        
+        .popup-thumbnail {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .popup-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            font-size: 0.875rem;
+        }
+        
+        .popup-meta {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+        }
+        
+        .popup-links {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .popup-links a {
+            font-size: 0.75rem;
+            color: var(--primary-color);
+            text-decoration: none;
+            padding: 0.25rem 0.5rem;
+            border: 1px solid var(--primary-color);
+            border-radius: 0.25rem;
+        }
+        
+        .popup-links a:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                padding: 0.75rem;
+            }
+            
+            .header h1 {
+                font-size: 1.25rem;
+            }
+            
+            .controls {
+                gap: 0.5rem;
+            }
+            
+            .btn {
+                padding: 0.375rem 0.75rem;
+                font-size: 0.8rem;
+            }
+            
+            #map {
+                height: calc(100vh - 70px);
+            }
+            
+            .config-panel {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                right: auto;
+                width: 90vw;
+                max-width: 350px;
+            }
+        }
+        
+        .startup-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        
+        .startup-modal.hidden {
+            display: none;
+        }
+        
+        .startup-content {
+            background: var(--bg-color);
+            border-radius: 1rem;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        
+        #modalHeader {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .startup-content h2 {
+            color: var(--primary-color);
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        
+        .cancel-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #6b7280;
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 0.25rem;
+            transition: all 0.2s;
+        }
+        
+        .cancel-btn:hover {
+            background: var(--header-bg);
+            color: var(--text-color);
+        }
+        
+        .startup-content p {
+            margin-bottom: 2rem;
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+        
+        .startup-options {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .startup-btn {
+            padding: 1rem 2rem;
+            border: 2px solid var(--primary-color);
+            border-radius: 0.5rem;
+            background: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .startup-btn:hover {
+            background: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+        
+        .startup-btn.secondary {
+            background: transparent;
+            color: var(--primary-color);
+        }
+        
+        .startup-btn.secondary:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .startup-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .location-search {
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        .location-search.show {
+            display: block;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }
+        
+        .search-results {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        
+        .search-results.show {
+            display: block;
+        }
+        
+        .search-result {
+            padding: 0.75rem;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+            text-align: left;
+        }
+        
+        .search-result:hover {
+            background: var(--header-bg);
+        }
+        
+        .search-result:last-child {
+            border-bottom: none;
+        }
+        
+        .result-title {
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        
+        .result-description {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+        
+        .location-error {
+            text-align: center;
+            padding: 2rem 0;
+        }
+        
+        .error-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .location-error h3 {
+            color: var(--error-color);
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+        }
+        
+        .location-error p {
+            margin-bottom: 1.5rem;
+            color: var(--text-color);
+        }
+        
+        .browser-instructions {
+            background: var(--header-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: left;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+        
+        .browser-instructions h4 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+        
+        .browser-instructions ol {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+        
+        .browser-instructions li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .browser-instructions strong {
+            color: var(--text-color);
+        }
+        
+        .error-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <!-- Startup Location Modal -->
+    <div id="startupModal" class="startup-modal">
+        <div class="startup-content">
+            <div id="modalHeader">
+                <h2>📍 Choose Your Location</h2>
+                <button id="cancelLocationBtn" class="cancel-btn" style="display: none;">✕</button>
+            </div>
+            <p id="modalDescription">To show you relevant photos, we need to know your location. We'll display photos within 1000m of your chosen location.</p>
+            
+            <div id="startupOptions" class="startup-options">
+                <button id="useLocationBtn" class="startup-btn">
+                    🎯 Use My Current Location
+                </button>
+                
+                <button id="chooseLocationBtn" class="startup-btn secondary">
+                    🗺️ Choose Location Manually
+                </button>
+            </div>
+            
+            <!-- Location Error Help -->
+            <div id="locationError" class="location-error" style="display: none;">
+                <div class="error-icon">⚠️</div>
+                <h3>Location Access Blocked</h3>
+                <p id="errorMessage">Unable to access your location.</p>
+                <div id="browserInstructions" class="browser-instructions"></div>
+                <div class="error-actions">
+                    <button id="retryLocationBtn" class="startup-btn">🔄 Try Again</button>
+                    <button id="manualLocationBtn" class="startup-btn secondary">🗺️ Choose Manually</button>
+                </div>
+            </div>
+            
+            <div id="locationSearch" class="location-search">
+                <input type="text" id="searchInput" class="search-input" 
+                       placeholder="Search for a city, address, or landmark...">
+                <div id="searchResults" class="search-results"></div>
+                <button id="confirmLocationBtn" class="startup-btn" disabled>
+                    ✓ Confirm Location
+                </button>
+            </div>
+        </div>
+    </div>
+    <header class="header">
+        <h1>📍 Photo Mapper <span style="font-size: 0.6em; color: #059669;">v2.0 DB</span></h1>
+        <div class="controls">
+            <div id="status" class="status">Ready</div>
+            <button id="refreshBtn" class="btn btn-primary">Refresh</button>
+            <button id="changeLocationBtn" class="btn">📍 Change Location</button>
+            <button id="viewportBtn" class="btn">🔍 Search Area</button>
+            <button id="adminBtn" class="btn">📊 Admin</button>
+            <div style="position: relative;">
+                <button id="configBtn" class="btn">⚙️ Config</button>
+                <div id="configPanel" class="config-panel">
+                    <div class="form-group">
+                        <label for="backendUrl">Backend URL:</label>
+                        <input type="url" id="backendUrl" placeholder="https://script.google.com/...">
+                    </div>
+                    <div class="form-group">
+                        <label for="folderId">Folder ID (optional):</label>
+                        <input type="text" id="folderId" placeholder="Drive folder ID">
+                    </div>
+                    <div class="form-group">
+                        <label for="apiToken">API Token (optional):</label>
+                        <input type="password" id="apiToken" placeholder="API token">
+                    </div>
+                    <hr style="margin: 1rem 0; border-color: var(--border-color);">
+                    <div class="form-group">
+                        <label for="searchRadius">Search Radius (meters):</label>
+                        <input type="number" id="searchRadius" value="1000" min="100" max="50000" step="100">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="autoLoadViewport" checked> 
+                            Auto-load photos in viewport
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <button id="saveConfigBtn" class="btn btn-primary" style="width: 100%;">Save & Load</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    
+    <!-- Leaflet MarkerCluster JS -->
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+    <script>
+        // Application state
+        const APP = {
+            map: null,
+            markers: null,
+            photos: [],
+            userLocation: null,
+            selectedLocation: null,
+            searchRadius: 1000,
+            autoLoadViewport: false, // Changed default to false
+            viewportBounds: null,
+            isViewportSearch: false,
+            isLocationSet: false,
+            config: {
+                backendUrl: '',
+                folderId: '',
+                apiToken: ''
+            }
+        };
+
+        // Configuration management
+        function loadConfig() {
+            try {
+                const saved = localStorage.getItem('photoMapperConfig');
+                if (saved) {
+                    const config = JSON.parse(saved);
+                    APP.config = { ...APP.config, ...config };
+                    APP.searchRadius = config.searchRadius || 1000;
+                    APP.autoLoadViewport = config.autoLoadViewport !== false;
+                }
+            } catch (e) {
+                console.warn('Error loading config:', e);
+            }
+            
+            // Update form fields
+            document.getElementById('backendUrl').value = APP.config.backendUrl;
+            document.getElementById('folderId').value = APP.config.folderId;
+            document.getElementById('apiToken').value = APP.config.apiToken;
+            document.getElementById('searchRadius').value = APP.searchRadius;
+            document.getElementById('autoLoadViewport').checked = APP.autoLoadViewport;
+        }
+
+        function saveConfig() {
+            APP.config = {
+                backendUrl: document.getElementById('backendUrl').value.trim(),
+                folderId: document.getElementById('folderId').value.trim(),
+                apiToken: document.getElementById('apiToken').value.trim(),
+                searchRadius: parseInt(document.getElementById('searchRadius').value) || 1000,
+                autoLoadViewport: document.getElementById('autoLoadViewport').checked
+            };
+            
+            APP.searchRadius = APP.config.searchRadius;
+            APP.autoLoadViewport = APP.config.autoLoadViewport;
+            
+            try {
+                localStorage.setItem('photoMapperConfig', JSON.stringify(APP.config));
+            } catch (e) {
+                console.warn('Error saving config:', e);
+            }
+        }
+
+        // Status management
+        function setStatus(message, type = 'success') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        // Map initialization
+        function initMap() {
+            // Start with a neutral world view
+            APP.map = L.map('map').setView([40.7128, -74.0060], 2);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(APP.map);
+            
+            // Initialize marker cluster group
+            APP.markers = L.markerClusterGroup({
+                chunkedLoading: true,
+                maxClusterRadius: 50
+            });
+            APP.map.addLayer(APP.markers);
+            
+            // Add user interaction detection for viewport search
+            let viewportChangeTimeout;
+            let isUserInteracting = false;
+            let isProgrammaticChange = false;
+            
+            // Track user interactions to distinguish from programmatic changes
+            APP.map.on('mousedown', () => {
+                isUserInteracting = true;
+            });
+            
+            APP.map.on('mouseup', () => {
+                // Delay to allow for final move events
+                setTimeout(() => {
+                    isUserInteracting = false;
+                }, 100);
+            });
+            
+            // Track zoom start (user interaction)
+            APP.map.on('zoomstart', (e) => {
+                if (!isProgrammaticChange) {
+                    isUserInteracting = true;
+                }
+            });
+            
+            // Track keyboard interactions (arrow keys, +/- zoom)
+            APP.map.getContainer().addEventListener('keydown', () => {
+                isUserInteracting = true;
+            });
+            
+            APP.map.getContainer().addEventListener('keyup', () => {
+                setTimeout(() => {
+                    isUserInteracting = false;
+                }, 100);
+            });
+            
+            // Track zoom end
+            APP.map.on('zoomend', (e) => {
+                if (isProgrammaticChange) {
+                    isProgrammaticChange = false;
+                    return;
+                }
+                
+                // Delay to allow for final events
+                setTimeout(() => {
+                    if (!isUserInteracting && APP.autoLoadViewport && APP.config.backendUrl && APP.isLocationSet) {
+                        loadPhotosInViewport();
+                    }
+                    isUserInteracting = false;
+                }, 200);
+            });
+            
+            // Track move end (drag/pan)
+            APP.map.on('moveend', (e) => {
+                if (isProgrammaticChange) {
+                    isProgrammaticChange = false;
+                    return;
+                }
+                
+                clearTimeout(viewportChangeTimeout);
+                viewportChangeTimeout = setTimeout(() => {
+                    if (!isUserInteracting && APP.autoLoadViewport && APP.config.backendUrl && APP.isLocationSet) {
+                        loadPhotosInViewport();
+                    }
+                    isUserInteracting = false;
+                }, 300); // Debounce with longer delay for drag operations
+            });
+            
+            // Store reference to programmatic change flag for use by other functions
+            APP.setProgrammaticChange = (value) => {
+                isProgrammaticChange = value;
+            };
+        }
+
+        // Photo loading and mapping
+        async function loadPhotos() {
+            if (!APP.config.backendUrl) {
+                setStatus('Please configure backend URL', 'error');
+                return;
+            }
+            
+            // Reset viewport search flag for normal loading
+            APP.isViewportSearch = false;
+
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.disabled = true;
+            setStatus('Loading photos...', 'loading');
+
+            try {
+                const url = new URL(APP.config.backendUrl);
+                url.searchParams.set('route', 'list');
+                
+                if (APP.config.folderId) {
+                    url.searchParams.set('folderId', APP.config.folderId);
+                }
+                
+                if (APP.config.apiToken) {
+                    url.searchParams.set('token', APP.config.apiToken);
+                }
+
+                const response = await fetch(url.toString());
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                APP.photos = data.photos || [];
+                displayPhotosOnMap();
+                
+                const cacheInfo = data.cached ? ' (cached)' : '';
+                setStatus(`Loaded ${APP.photos.length} photos${cacheInfo}`, 'success');
+
+            } catch (error) {
+                console.error('Error loading photos:', error);
+                setStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                refreshBtn.disabled = false;
+            }
+        }
+
+        function displayPhotosOnMap() {
+            // Clear existing markers
+            APP.markers.clearLayers();
+
+            if (APP.photos.length === 0) {
+                setStatus('No photos with GPS data found', 'warning');
+                return;
+            }
+
+            const bounds = [];
+            
+            APP.photos.forEach(photo => {
+                const { latitude, longitude } = photo.imageMediaMetadata.location;
+                
+                // Create marker
+                const marker = L.marker([latitude, longitude]);
+                
+                // Create popup content
+                const popupContent = createPopupContent(photo);
+                marker.bindPopup(popupContent, { maxWidth: 280 });
+                
+                // Add to cluster group
+                APP.markers.addLayer(marker);
+                
+                // Add to bounds
+                bounds.push([latitude, longitude]);
+            });
+
+            // Fit map to show all markers (only if not in viewport search mode)
+            if (bounds.length > 0 && !APP.isViewportSearch) {
+                if (APP.setProgrammaticChange) {
+                    APP.setProgrammaticChange(true);
+                }
+                APP.map.fitBounds(bounds, { padding: [20, 20] });
+            }
+        }
+
+        function createPopupContent(photo) {
+            const { name, imageMediaMetadata, thumbnailLink, webViewLink, webContentLink, modifiedTime } = photo;
+            const { time, location } = imageMediaMetadata;
+            
+            // Format date
+            const dateStr = time || modifiedTime;
+            const formattedDate = dateStr ? new Date(dateStr).toLocaleDateString() : 'Unknown date';
+            
+            // Format coordinates
+            const coords = `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
+            const altitude = location.altitude ? ` (${Math.round(location.altitude)}m)` : '';
+            
+            return `
+                <div class="popup-content">
+                    ${thumbnailLink ? `<img src="${thumbnailLink}" alt="${name}" class="popup-thumbnail" loading="lazy">` : ''}
+                    <div class="popup-title">${name}</div>
+                    <div class="popup-meta">
+                        📅 ${formattedDate}<br>
+                        📍 ${coords}${altitude}
+                    </div>
+                    <div class="popup-links">
+                        <a href="${webViewLink}" target="_blank" rel="noopener">View</a>
+                        ${webContentLink ? `<a href="${webContentLink}" target="_blank" rel="noopener">Download</a>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Browser detection and instruction functions
+        function detectBrowser() {
+            const userAgent = navigator.userAgent;
+            
+            if (userAgent.includes('Chrome') && !userAgent.includes('Edg')) {
+                return 'chrome';
+            } else if (userAgent.includes('Firefox')) {
+                return 'firefox';
+            } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
+                return 'safari';
+            } else if (userAgent.includes('Edg')) {
+                return 'edge';
+            } else {
+                return 'unknown';
+            }
+        }
+        
+        function getBrowserInstructions(browser, error) {
+            const instructions = {
+                chrome: {
+                    title: "Enable Location in Chrome",
+                    steps: [
+                        "Click the <strong>🔒 lock icon</strong> in the address bar",
+                        "Set <strong>Location</strong> to <strong>Allow</strong>",
+                        "Refresh the page and try again",
+                        "Alternative: Go to <strong>Settings > Privacy and security > Site Settings > Location</strong>"
+                    ]
+                },
+                firefox: {
+                    title: "Enable Location in Firefox", 
+                    steps: [
+                        "Click the <strong>🛡️ shield icon</strong> in the address bar",
+                        "Click <strong>Turn off blocking for this site</strong>",
+                        "Or click the <strong>location icon</strong> and select <strong>Allow</strong>",
+                        "Refresh the page and try again"
+                    ]
+                },
+                safari: {
+                    title: "Enable Location in Safari",
+                    steps: [
+                        "Go to <strong>Safari > Preferences > Privacy</strong>",
+                        "Click <strong>Manage Website Data</strong>",
+                        "Or check the address bar for a location prompt",
+                        "Allow location access when prompted"
+                    ]
+                },
+                edge: {
+                    title: "Enable Location in Microsoft Edge",
+                    steps: [
+                        "Click the <strong>🔒 lock icon</strong> in the address bar",
+                        "Set <strong>Location</strong> to <strong>Allow</strong>",
+                        "Refresh the page and try again",
+                        "Alternative: Go to <strong>Settings > Site permissions > Location</strong>"
+                    ]
+                },
+                unknown: {
+                    title: "Enable Location in Your Browser",
+                    steps: [
+                        "Look for a <strong>location icon</strong> in the address bar",
+                        "Check your browser's privacy or security settings",
+                        "Allow location access for this website",
+                        "Refresh the page and try again"
+                    ]
+                }
+            };
+            
+            return instructions[browser] || instructions.unknown;
+        }
+        
+        // Debug function to check geolocation status
+        async function checkGeolocationStatus() {
+            const status = {
+                available: !!navigator.geolocation,
+                https: location.protocol === 'https:' || location.hostname === 'localhost',
+                permission: 'unknown'
+            };
+            
+            if (navigator.permissions) {
+                try {
+                    const result = await navigator.permissions.query({ name: 'geolocation' });
+                    status.permission = result.state;
+                } catch (e) {
+                    console.log('Could not check permission state:', e);
+                }
+            }
+            
+            console.log('Geolocation status:', status);
+            return status;
+        }
+        
+        function showLocationError(error) {
+            const browser = detectBrowser();
+            const instructions = getBrowserInstructions(browser, error);
+            
+            // Log detailed error information for debugging
+            console.error('Location error details:', error);
+            checkGeolocationStatus();
+            
+            // Hide other sections
+            document.getElementById('startupOptions').style.display = 'none';
+            document.getElementById('locationSearch').classList.remove('show');
+            
+            // Show error section
+            const errorSection = document.getElementById('locationError');
+            errorSection.style.display = 'block';
+            
+            // Update error message based on error type
+            const errorMessage = document.getElementById('errorMessage');
+            let message = '';
+            
+            switch(error.code) {
+                case 1: // PERMISSION_DENIED
+                    message = "Location access was denied. Please enable location sharing to use this feature.";
+                    break;
+                case 2: // POSITION_UNAVAILABLE
+                    message = "Your location is currently unavailable. Please try again or choose manually.";
+                    break;
+                case 3: // TIMEOUT
+                    message = "Location request timed out. Please try again or choose manually.";
+                    break;
+                case 0: // Custom error (e.g., HTTPS required)
+                    message = error.message || "Geolocation not supported.";
+                    break;
+                default:
+                    message = "Unable to access your location. Please enable location sharing.";
+                    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                        message += " Note: Location access requires HTTPS.";
+                    }
+            }
+            
+            errorMessage.textContent = message;
+            
+            // Show browser-specific instructions only for permission errors
+            const instructionsDiv = document.getElementById('browserInstructions');
+            if (error.code === 1 || error.code === undefined) {
+                instructionsDiv.innerHTML = `
+                    <h4>${instructions.title}</h4>
+                    <ol>
+                        ${instructions.steps.map(step => `<li>${step}</li>`).join('')}
+                    </ol>
+                `;
+            } else {
+                // For non-permission errors, show general guidance
+                instructionsDiv.innerHTML = `
+                    <h4>Troubleshooting Steps</h4>
+                    <ol>
+                        <li>Make sure you're using a <strong>secure connection (HTTPS)</strong></li>
+                        <li>Check that location services are enabled on your device</li>
+                        <li>Try refreshing the page and allowing location access</li>
+                        <li>If the problem persists, try choosing your location manually</li>
+                    </ol>
+                `;
+            }
+        }
+        
+        function resetLocationModal() {
+            // Hide error section
+            document.getElementById('locationError').style.display = 'none';
+            
+            // Show main options
+            document.getElementById('startupOptions').style.display = 'flex';
+            
+            // Reset buttons
+            const useLocationBtn = document.getElementById('useLocationBtn');
+            useLocationBtn.disabled = false;
+            useLocationBtn.textContent = '🎯 Use My Current Location';
+            
+            // Hide search if it was shown
+            document.getElementById('locationSearch').classList.remove('show');
+            
+            // Clear search input
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchResults').classList.remove('show');
+            document.getElementById('confirmLocationBtn').disabled = true;
+        }
+
+        // Startup location selection functions
+        async function initializeLocationSelection(isStartup = true) {
+            const modal = document.getElementById('startupModal');
+            
+            // Show/hide cancel button based on startup mode
+            const cancelBtn = document.getElementById('cancelLocationBtn');
+            if (isStartup) {
+                cancelBtn.style.display = 'none';
+            } else {
+                cancelBtn.style.display = 'block';
+            }
+            
+            // Check if we have a saved location preference (only for startup)
+            if (isStartup) {
+                const savedLocation = localStorage.getItem('photoMapperLocation');
+                if (savedLocation && APP.config.backendUrl) {
+                    try {
+                        APP.selectedLocation = JSON.parse(savedLocation);
+                        APP.isLocationSet = true;
+                        hideStartupModal();
+                        initializeWithLocation(APP.selectedLocation);
+                        return;
+                    } catch (e) {
+                        console.warn('Invalid saved location, showing modal');
+                    }
+                }
+            }
+            
+            // Show modal if no backend URL configured
+            if (!APP.config.backendUrl) {
+                modal.classList.add('hidden');
+                setStatus('Configure backend URL first', 'warning');
+                return;
+            }
+            
+            // Reset modal state
+            resetLocationModal();
+            
+            // Show location selection modal
+            modal.classList.remove('hidden');
+            setupLocationModal(isStartup);
+        }
+        
+        function setupLocationModal(isStartup = true) {
+            // Clear any existing event listeners without cloning (which can break geolocation context)
+            const useLocationBtn = document.getElementById('useLocationBtn');
+            const chooseLocationBtn = document.getElementById('chooseLocationBtn');
+            const cancelBtn = document.getElementById('cancelLocationBtn');
+            const searchInput = document.getElementById('searchInput');
+            const confirmBtn = document.getElementById('confirmLocationBtn');
+            const retryBtn = document.getElementById('retryLocationBtn');
+            const manualBtn = document.getElementById('manualLocationBtn');
+            
+            // Remove existing event listeners by replacing elements (safer than cloning the whole modal)
+            if (useLocationBtn._listenerAttached) {
+                const newUseLocationBtn = useLocationBtn.cloneNode(true);
+                useLocationBtn.parentNode.replaceChild(newUseLocationBtn, useLocationBtn);
+            }
+            
+            // Re-get elements after potential replacement
+            const finalUseLocationBtn = document.getElementById('useLocationBtn');
+            const finalChooseLocationBtn = document.getElementById('chooseLocationBtn');
+            const finalCancelBtn = document.getElementById('cancelLocationBtn');
+            const finalSearchInput = document.getElementById('searchInput');
+            const finalConfirmBtn = document.getElementById('confirmLocationBtn');
+            const finalRetryBtn = document.getElementById('retryLocationBtn');
+            const finalManualBtn = document.getElementById('manualLocationBtn');
+            
+            // Cancel button (only for non-startup)
+            if (!isStartup) {
+                finalCancelBtn.addEventListener('click', () => {
+                    hideStartupModal();
+                    setStatus('Location selection cancelled', 'warning');
+                });
+            }
+            
+            // Use current location - with improved geolocation handling
+            finalUseLocationBtn.addEventListener('click', async (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                console.log('Location button clicked, requesting geolocation...');
+                
+                finalUseLocationBtn.disabled = true;
+                finalUseLocationBtn.textContent = '🎯 Getting Location...';
+                
+                // Check if geolocation is available
+                if (!navigator.geolocation) {
+                    console.error('Geolocation not supported');
+                    showLocationError({ 
+                        code: 0, 
+                        message: 'Geolocation not supported by this browser' 
+                    });
+                    return;
+                }
+                
+                // Check HTTPS requirement
+                if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                    console.warn('Geolocation requires HTTPS');
+                    showLocationError({ 
+                        code: 1, 
+                        message: 'Location access requires HTTPS connection' 
+                    });
+                    return;
+                }
+                
+                try {
+                    console.log('Calling getCurrentPosition...');
+                    const position = await getCurrentPositionImproved();
+                    console.log('Location received:', position);
+                    
+                    APP.userLocation = position;
+                    APP.selectedLocation = position;
+                    saveLocationPreference(position);
+                    
+                    hideStartupModal();
+                    initializeWithLocation(position);
+                    
+                } catch (error) {
+                    console.error('Location access error:', error);
+                    showLocationError(error);
+                }
+            });
+            
+            // Mark that listener is attached
+            finalUseLocationBtn._listenerAttached = true;
+            
+            // Choose location manually
+            finalChooseLocationBtn.addEventListener('click', () => {
+                document.getElementById('locationSearch').classList.add('show');
+                finalSearchInput.focus();
+            });
+            
+            // Retry location button
+            finalRetryBtn.addEventListener('click', () => {
+                resetLocationModal();
+            });
+            
+            // Manual location button from error state
+            finalManualBtn.addEventListener('click', () => {
+                resetLocationModal();
+                document.getElementById('locationSearch').classList.add('show');
+                finalSearchInput.focus();
+            });
+            
+            // Search functionality
+            let searchTimeout;
+            finalSearchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                const query = e.target.value.trim();
+                
+                if (query.length < 3) {
+                    document.getElementById('searchResults').classList.remove('show');
+                    return;
+                }
+                
+                searchTimeout = setTimeout(() => searchLocation(query), 500);
+            });
+            
+            // Confirm selected location
+            finalConfirmBtn.addEventListener('click', () => {
+                if (APP.selectedLocation) {
+                    saveLocationPreference(APP.selectedLocation);
+                    hideStartupModal();
+                    initializeWithLocation(APP.selectedLocation);
+                }
+            });
+        }
+        
+        // Legacy function - keeping for backward compatibility
+        async function getCurrentPosition() {
+            return getCurrentPositionImproved();
+        }
+        
+        // Improved geolocation function with better browser compatibility
+        async function getCurrentPositionImproved() {
+            return new Promise((resolve, reject) => {
+                console.log('Starting geolocation request...');
+                
+                if (!navigator.geolocation) {
+                    console.error('Geolocation not available');
+                    reject(new Error('Geolocation not supported'));
+                    return;
+                }
+                
+                // Check permission state if available (newer browsers)
+                if (navigator.permissions) {
+                    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+                        console.log('Geolocation permission state:', result.state);
+                        
+                        if (result.state === 'denied') {
+                            reject({
+                                code: 1,
+                                message: 'Location permission previously denied',
+                                PERMISSION_DENIED: 1
+                            });
+                            return;
+                        }
+                        
+                        // Proceed with location request
+                        requestLocation();
+                    }).catch(() => {
+                        // Fallback if permissions API not available
+                        console.log('Permissions API not available, proceeding with location request');
+                        requestLocation();
+                    });
+                } else {
+                    // Fallback for older browsers
+                    console.log('Permissions API not supported, proceeding with location request');
+                    requestLocation();
+                }
+                
+                function requestLocation() {
+                    console.log('Requesting current position from browser...');
+                    
+                    const options = {
+                        enableHighAccuracy: false, // Start with low accuracy for faster response
+                        timeout: 10000, // 10 seconds timeout
+                        maximumAge: 60000 // Accept cached position up to 1 minute old
+                    };
+                    
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            console.log('Geolocation success:', position);
+                            resolve({
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: position.coords.accuracy,
+                                source: 'geolocation',
+                                timestamp: position.timestamp
+                            });
+                        },
+                        (error) => {
+                            console.error('Geolocation error:', error);
+                            
+                            // Create a standardized error object
+                            const standardError = {
+                                code: error.code,
+                                message: error.message,
+                                PERMISSION_DENIED: 1,
+                                POSITION_UNAVAILABLE: 2,
+                                TIMEOUT: 3
+                            };
+                            
+                            reject(standardError);
+                        },
+                        options
+                    );
+                }
+            });
+        }
+        
+        async function searchLocation(query) {
+            try {
+                // Using Nominatim (OpenStreetMap) for geocoding - free and no API key required
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`
+                );
+                
+                if (!response.ok) {
+                    throw new Error('Search failed');
+                }
+                
+                const results = await response.json();
+                displaySearchResults(results);
+                
+            } catch (error) {
+                console.error('Location search error:', error);
+                setStatus('Location search failed', 'error');
+            }
+        }
+        
+        function displaySearchResults(results) {
+            const resultsContainer = document.getElementById('searchResults');
+            resultsContainer.innerHTML = '';
+            
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<div class="search-result">No locations found</div>';
+                resultsContainer.classList.add('show');
+                return;
+            }
+            
+            results.forEach(result => {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'search-result';
+                resultDiv.innerHTML = `
+                    <div class="result-title">${result.display_name.split(',')[0]}</div>
+                    <div class="result-description">${result.display_name}</div>
+                `;
+                
+                resultDiv.addEventListener('click', () => {
+                    const location = {
+                        latitude: parseFloat(result.lat),
+                        longitude: parseFloat(result.lon),
+                        name: result.display_name,
+                        source: 'search'
+                    };
+                    
+                    APP.selectedLocation = location;
+                    document.getElementById('searchInput').value = result.display_name.split(',')[0];
+                    document.getElementById('confirmLocationBtn').disabled = false;
+                    resultsContainer.classList.remove('show');
+                });
+                
+                resultsContainer.appendChild(resultDiv);
+            });
+            
+            resultsContainer.classList.add('show');
+        }
+        
+        function saveLocationPreference(location) {
+            try {
+                localStorage.setItem('photoMapperLocation', JSON.stringify(location));
+                APP.isLocationSet = true;
+            } catch (e) {
+                console.warn('Could not save location preference');
+            }
+        }
+        
+        function hideStartupModal() {
+            document.getElementById('startupModal').classList.add('hidden');
+        }
+        
+        function initializeWithLocation(location) {
+            // Set map center to selected location with 5000m x 5000m view
+            // Calculate zoom level for ~5km view (roughly zoom level 13-14)
+            const zoomLevel = 13;
+            if (APP.setProgrammaticChange) {
+                APP.setProgrammaticChange(true);
+            }
+            APP.map.setView([location.latitude, location.longitude], zoomLevel);
+            
+            // Add location marker
+            if (APP.locationMarker) {
+                APP.map.removeLayer(APP.locationMarker);
+            }
+            
+            APP.locationMarker = L.circle(
+                [location.latitude, location.longitude],
+                { 
+                    radius: APP.searchRadius, 
+                    color: '#2563eb', 
+                    fillOpacity: 0.1,
+                    weight: 2
+                }
+            ).addTo(APP.map);
+            
+            // Load photos in the area
+            loadPhotosNearSelectedLocation();
+            
+            const source = location.source === 'geolocation' ? 'current location' : 'selected location';
+            setStatus(`Centered on ${source}`, 'success');
+        }
+        
+        async function loadPhotosNearSelectedLocation() {
+            if (!APP.selectedLocation || !APP.config.backendUrl) {
+                return;
+            }
+            
+            // Reset viewport search flag for location-based loading
+            APP.isViewportSearch = false;
+            
+            const refreshBtn = document.getElementById('refreshBtn');
+            const originalText = refreshBtn.textContent;
+            refreshBtn.textContent = 'Loading...';
+            refreshBtn.disabled = true;
+            
+            try {
+                const url = new URL(APP.config.backendUrl);
+                url.searchParams.set('route', 'search');
+                url.searchParams.set('lat', APP.selectedLocation.latitude.toString());
+                url.searchParams.set('lng', APP.selectedLocation.longitude.toString());
+                url.searchParams.set('radius', APP.searchRadius.toString());
+                
+                if (APP.config.folderId) {
+                    url.searchParams.set('folderId', APP.config.folderId);
+                }
+                
+                if (APP.config.apiToken) {
+                    url.searchParams.set('token', APP.config.apiToken);
+                }
+                
+                const response = await fetch(url.toString());
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                APP.photos = data.photos || [];
+                displayPhotosOnMap();
+                
+                const distanceKm = (APP.searchRadius / 1000).toFixed(1);
+                const cacheInfo = data.cached ? ' (cached)' : '';
+                const locationName = APP.selectedLocation.name ? 
+                    APP.selectedLocation.name.split(',')[0] : 'selected location';
+                setStatus(`Found ${APP.photos.length} photos within ${distanceKm}km of ${locationName}${cacheInfo}`, 'success');
+                
+            } catch (error) {
+                console.error('Error loading location photos:', error);
+                setStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                refreshBtn.textContent = originalText;
+                refreshBtn.disabled = false;
+            }
+        }
+
+        // Location-based search functions
+        async function detectUserLocation() {
+            if (!navigator.geolocation) {
+                console.log('Geolocation not supported');
+                return;
+            }
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    APP.userLocation = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    };
+                    console.log('User location detected:', APP.userLocation);
+                },
+                (error) => {
+                    console.warn('Could not detect user location:', error.message);
+                },
+                { timeout: 10000, enableHighAccuracy: false, maximumAge: 300000 }
+            );
+        }
+        
+        async function loadPhotosInViewport() {
+            if (!APP.config.backendUrl) {
+                return;
+            }
+            
+            console.log('Loading photos in viewport (user interaction)');
+            
+            const bounds = APP.map.getBounds();
+            APP.viewportBounds = bounds;
+            APP.isViewportSearch = true;
+            
+            const refreshBtn = document.getElementById('refreshBtn');
+            const originalText = refreshBtn.textContent;
+            refreshBtn.textContent = 'Loading...';
+            refreshBtn.disabled = true;
+            
+            try {
+                const url = new URL(APP.config.backendUrl);
+                url.searchParams.set('route', 'search');
+                url.searchParams.set('north', bounds.getNorth().toString());
+                url.searchParams.set('south', bounds.getSouth().toString());
+                url.searchParams.set('east', bounds.getEast().toString());
+                url.searchParams.set('west', bounds.getWest().toString());
+                
+                if (APP.config.folderId) {
+                    url.searchParams.set('folderId', APP.config.folderId);
+                }
+                
+                if (APP.config.apiToken) {
+                    url.searchParams.set('token', APP.config.apiToken);
+                }
+                
+                const response = await fetch(url.toString());
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                APP.photos = data.photos || [];
+                displayPhotosOnMap();
+                
+                const cacheInfo = data.cached ? ' (cached)' : '';
+                setStatus(`Found ${APP.photos.length}/${data.totalCount} photos in area${cacheInfo}`, 'success');
+                
+            } catch (error) {
+                console.error('Error loading viewport photos:', error);
+                setStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                refreshBtn.textContent = originalText;
+                refreshBtn.disabled = false;
+            }
+        }
+        
+        async function loadPhotosNearLocation() {
+            if (!APP.userLocation || !APP.config.backendUrl) {
+                setStatus('Location not available', 'error');
+                return;
+            }
+            
+            const locationBtn = document.getElementById('locationBtn');
+            const originalText = locationBtn.textContent;
+            locationBtn.textContent = 'Searching...';
+            locationBtn.disabled = true;
+            APP.isViewportSearch = false;
+            
+            try {
+                const url = new URL(APP.config.backendUrl);
+                url.searchParams.set('route', 'search');
+                url.searchParams.set('lat', APP.userLocation.latitude.toString());
+                url.searchParams.set('lng', APP.userLocation.longitude.toString());
+                url.searchParams.set('radius', APP.searchRadius.toString());
+                
+                if (APP.config.folderId) {
+                    url.searchParams.set('folderId', APP.config.folderId);
+                }
+                
+                if (APP.config.apiToken) {
+                    url.searchParams.set('token', APP.config.apiToken);
+                }
+                
+                const response = await fetch(url.toString());
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                APP.photos = data.photos || [];
+                displayPhotosOnMap();
+                
+                // Center map on user location
+                if (APP.setProgrammaticChange) {
+                    APP.setProgrammaticChange(true);
+                }
+                APP.map.setView([APP.userLocation.latitude, APP.userLocation.longitude], 12);
+                
+                // Add user location marker
+                if (APP.userLocationMarker) {
+                    APP.map.removeLayer(APP.userLocationMarker);
+                }
+                
+                APP.userLocationMarker = L.circle(
+                    [APP.userLocation.latitude, APP.userLocation.longitude],
+                    { radius: APP.searchRadius, color: 'blue', fillOpacity: 0.1 }
+                ).addTo(APP.map);
+                
+                const distanceKm = (APP.searchRadius / 1000).toFixed(1);
+                const cacheInfo = data.cached ? ' (cached)' : '';
+                setStatus(`Found ${APP.photos.length} photos within ${distanceKm}km${cacheInfo}`, 'success');
+                
+            } catch (error) {
+                console.error('Error loading location photos:', error);
+                setStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                locationBtn.textContent = originalText;
+                locationBtn.disabled = false;
+            }
+        }
+        
+        function toggleViewportSearch() {
+            const btn = document.getElementById('viewportBtn');
+            
+            if (APP.autoLoadViewport) {
+                APP.autoLoadViewport = false;
+                APP.isViewportSearch = false; // Reset flag when disabling
+                btn.textContent = '🔍 Search Disabled';
+                btn.style.opacity = '0.6';
+                setStatus('Viewport search disabled', 'warning');
+                console.log('Viewport search disabled');
+            } else {
+                APP.autoLoadViewport = true;
+                btn.textContent = '🔍 Search Area';
+                btn.style.opacity = '1';
+                setStatus('Viewport search enabled', 'success');
+                console.log('Viewport search enabled');
+                if (APP.config.backendUrl) {
+                    loadPhotosInViewport();
+                }
+            }
+        }
+
+        // Event handlers
+        function setupEventHandlers() {
+            // Config panel toggle
+            document.getElementById('configBtn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                const panel = document.getElementById('configPanel');
+                panel.classList.toggle('show');
+            });
+
+            // Close config panel when clicking outside
+            document.addEventListener('click', (e) => {
+                const panel = document.getElementById('configPanel');
+                const btn = document.getElementById('configBtn');
+                
+                if (!panel.contains(e.target) && !btn.contains(e.target)) {
+                    panel.classList.remove('show');
+                }
+            });
+
+            // Save config and reload photos
+            document.getElementById('saveConfigBtn').addEventListener('click', () => {
+                const oldRadius = APP.searchRadius;
+                saveConfig();
+                document.getElementById('configPanel').classList.remove('show');
+                
+                // If backend URL just got configured, start location selection
+                if (!APP.isLocationSet && APP.config.backendUrl) {
+                    initializeLocationSelection();
+                } else if (APP.isLocationSet && (oldRadius !== APP.searchRadius)) {
+                    // Reload with new radius
+                    loadPhotosNearSelectedLocation();
+                } else if (APP.isLocationSet) {
+                    // Regular refresh
+                    loadPhotosNearSelectedLocation();
+                } else {
+                    // Fallback to old behavior
+                    loadPhotos();
+                }
+            });
+
+            // Refresh button - refresh current location-based search
+            document.getElementById('refreshBtn').addEventListener('click', () => {
+                if (APP.isLocationSet && APP.selectedLocation) {
+                    loadPhotosNearSelectedLocation();
+                } else {
+                    loadPhotos();
+                }
+            });
+            
+            // Location-based search buttons
+            document.getElementById('changeLocationBtn').addEventListener('click', () => {
+                // Clear current selection (but keep saved location for startup)
+                APP.isLocationSet = false;
+                APP.selectedLocation = null;
+                if (APP.locationMarker) {
+                    APP.map.removeLayer(APP.locationMarker);
+                }
+                // Show modal in non-startup mode (with cancel button)
+                initializeLocationSelection(false);
+            });
+            
+            document.getElementById('viewportBtn').addEventListener('click', toggleViewportSearch);
+            
+            // Admin interface button
+            document.getElementById('adminBtn').addEventListener('click', () => {
+                window.open('admin.html', '_blank');
+            });
+
+            // Enter key in config inputs
+            document.querySelectorAll('#configPanel input').forEach(input => {
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        document.getElementById('saveConfigBtn').click();
+                    }
+                });
+            });
+        }
+
+        // Test geolocation function for debugging (call from console: testGeolocation())
+        window.testGeolocation = async function() {
+            console.log('=== Geolocation Test ===');
+            
+            // Check basic availability
+            console.log('1. Geolocation available:', !!navigator.geolocation);
+            console.log('2. HTTPS/localhost:', location.protocol === 'https:' || location.hostname === 'localhost');
+            console.log('3. Current URL:', location.href);
+            
+            // Check permissions if available
+            if (navigator.permissions) {
+                try {
+                    const result = await navigator.permissions.query({ name: 'geolocation' });
+                    console.log('4. Permission state:', result.state);
+                } catch (e) {
+                    console.log('4. Permissions API error:', e);
+                }
+            } else {
+                console.log('4. Permissions API not supported');
+            }
+            
+            // Test actual geolocation request
+            if (navigator.geolocation) {
+                console.log('5. Testing geolocation request...');
+                
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        console.log('✅ Geolocation SUCCESS:', {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        });
+                    },
+                    (error) => {
+                        console.log('❌ Geolocation ERROR:', {
+                            code: error.code,
+                            message: error.message,
+                            codes: {
+                                1: 'PERMISSION_DENIED',
+                                2: 'POSITION_UNAVAILABLE', 
+                                3: 'TIMEOUT'
+                            }
+                        });
+                    },
+                    {
+                        enableHighAccuracy: false,
+                        timeout: 10000,
+                        maximumAge: 60000
+                    }
+                );
+            }
+            
+            console.log('=== Test initiated, check for popup and results above ===');
+        };
+
+        // Initialize application
+        function init() {
+            loadConfig();
+            initMap();
+            setupEventHandlers();
+            
+            // Start with location selection flow
+            setTimeout(() => initializeLocationSelection(), 500);
+            
+            // Check automation status
+            checkAutomationStatus();
+            
+            // Log helpful debugging info
+            console.log('Photo Mapper v2.0 DB initialized. Run testGeolocation() to debug location issues.');
+        }
+        
+        // Check if automation is enabled
+        async function checkAutomationStatus() {
+            if (!APP.config.backendUrl) return;
+            
+            try {
+                const url = new URL(APP.config.backendUrl);
+                url.searchParams.set('route', 'admin');
+                url.searchParams.set('action', 'status');
+                
+                if (APP.config.apiToken) {
+                    url.searchParams.set('token', APP.config.apiToken);
+                }
+                
+                const response = await fetch(url.toString());
+                const data = await response.json();
+                
+                if (data.automation && data.triggerCount > 0) {
+                    console.log(`✅ Automation active with ${data.triggerCount} triggers`);
+                    // Could add a small indicator to the UI here
+                } else {
+                    console.log('⚠️ Automation not configured. Use admin interface to set up automatic updates.');
+                }
+                
+            } catch (error) {
+                // Silently fail - not critical for main app function
+                console.log('Could not check automation status');
+            }
+        }
+
+        // Start the application when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Mapper - Admin Interface</title>
+    
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --bg-color: #ffffff;
+            --text-color: #1f2937;
+            --border-color: #e5e7eb;
+            --header-bg: #f8fafc;
+            --success-color: #059669;
+            --error-color: #dc2626;
+            --warning-color: #d97706;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #111827;
+                --text-color: #f3f4f6;
+                --border-color: #374151;
+                --header-bg: #1f2937;
+            }
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: var(--header-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: var(--primary-color);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .status-card {
+            background: var(--header-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+        }
+        
+        .status-card h3 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            font-size: 1.125rem;
+        }
+        
+        .status-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--text-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .status-label {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .action-section {
+            background: var(--header-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+        }
+        
+        .action-section h3 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            font-size: 1.125rem;
+        }
+        
+        .action-section p {
+            color: #6b7280;
+            margin-bottom: 1.5rem;
+            font-size: 0.875rem;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border: 1px solid var(--primary-color);
+            border-radius: 0.375rem;
+            background: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .btn:hover {
+            background: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn.secondary {
+            background: transparent;
+            color: var(--primary-color);
+        }
+        
+        .btn.secondary:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .btn.danger {
+            background: var(--error-color);
+            border-color: var(--error-color);
+        }
+        
+        .btn.danger:hover {
+            background: #b91c1c;
+            border-color: #b91c1c;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-size: 0.875rem;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }
+        
+        .log-area {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            padding: 1rem;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            margin-top: 1rem;
+        }
+        
+        .log-entry {
+            margin-bottom: 0.25rem;
+            padding: 0.25rem 0;
+        }
+        
+        .log-entry.success {
+            color: var(--success-color);
+        }
+        
+        .log-entry.error {
+            color: var(--error-color);
+        }
+        
+        .log-entry.info {
+            color: var(--primary-color);
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--success-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .status-info {
+            background: var(--header-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            padding: 1rem;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+        
+        .automation-schedule {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+            font-size: 0.8rem;
+        }
+        
+        .schedule-item {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
+            padding: 0.75rem;
+        }
+        
+        .schedule-item strong {
+            color: var(--primary-color);
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+            
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .actions-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .automation-schedule {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Photo Mapper Admin</h1>
+            <p>Database management and processing controls</p>
+        </div>
+        
+        <div class="status-grid" id="statusGrid">
+            <div class="status-card">
+                <h3>Database Status</h3>
+                <div class="status-value" id="dbStatus">Loading...</div>
+                <div class="status-label">Connection Status</div>
+            </div>
+            
+            <div class="status-card">
+                <h3>Total Photos</h3>
+                <div class="status-value" id="totalPhotos">0</div>
+                <div class="status-label">In Database</div>
+            </div>
+            
+            <div class="status-card">
+                <h3>GPS Photos</h3>
+                <div class="status-value" id="gpsPhotos">0</div>
+                <div class="status-label">With Location Data</div>
+            </div>
+            
+            <div class="status-card">
+                <h3>Processing Rate</h3>
+                <div class="status-value" id="processingRate">0%</div>
+                <div class="status-label">Photos with GPS / Total</div>
+            </div>
+        </div>
+        
+        <div class="actions-grid">
+            <div class="action-section">
+                <h3>🔧 Setup & Configuration</h3>
+                <p>Initialize the database and configure basic settings.</p>
+                
+                <div class="form-group">
+                    <label for="backendUrl">Backend URL:</label>
+                    <input type="url" id="backendUrl" placeholder="https://script.google.com/...">
+                </div>
+                
+                <div class="form-group">
+                    <label for="folderId">Drive Folder ID:</label>
+                    <input type="text" id="folderId" placeholder="Google Drive folder ID">
+                </div>
+                
+                <div class="form-group">
+                    <label for="apiToken">API Token (optional):</label>
+                    <input type="password" id="apiToken" placeholder="API authentication token">
+                </div>
+                
+                <button class="btn" onclick="initializeDatabase()">Initialize Database</button>
+                <button class="btn secondary" onclick="loadConfig()">Load Config</button>
+                <button class="btn secondary" onclick="saveConfig()">Save Config</button>
+            </div>
+            
+            <div class="action-section">
+                <h3>📸 Photo Processing</h3>
+                <p>Process photos to extract GPS metadata and store in database.</p>
+                
+                <button class="btn" onclick="processPhotos()">Process All Photos</button>
+                <button class="btn secondary" onclick="incrementalProcess()">Incremental Update</button>
+                <button class="btn secondary" onclick="reprocessPhotos()">Reprocess All</button>
+                
+                <div class="progress-bar" style="display: none;" id="processProgress">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+            
+            <div class="action-section">
+                <h3>🤖 Automation</h3>
+                <p>Automated incremental updates and monitoring system.</p>
+                
+                <div class="form-group">
+                    <label for="notificationEmail">Notification Email (optional):</label>
+                    <input type="email" id="notificationEmail" placeholder="admin@example.com">
+                </div>
+                
+                <button class="btn" onclick="setupAutomation()">Setup Automation</button>
+                <button class="btn secondary" onclick="testAutomation()">Test Automation</button>
+                <button class="btn danger" onclick="clearAutomation()">Clear Triggers</button>
+                
+                <div id="automationStatus" class="status-info" style="margin-top: 1rem; display: none;">
+                    <strong>Status:</strong> <span id="automationStatusText">Unknown</span><br>
+                    <strong>Triggers:</strong> <span id="triggerCount">0</span><br>
+                    <strong>Last Update:</strong> <span id="lastUpdate">Never</span>
+                </div>
+            </div>
+            
+            <div class="action-section">
+                <h3>🧹 Maintenance</h3>
+                <p>Database maintenance and cleanup operations.</p>
+                
+                <button class="btn secondary" onclick="cleanupDatabase()">Cleanup Database</button>
+                <button class="btn secondary" onclick="clearCache()">Clear Cache</button>
+                <button class="btn secondary" onclick="checkHealth()">Health Check</button>
+                <button class="btn danger" onclick="refreshStats()">Refresh Stats</button>
+            </div>
+            
+            <div class="action-section">
+                <h3>📋 Activity Log</h3>
+                <p>Real-time processing and operation logs.</p>
+                
+                <div class="log-area" id="logArea">
+                    <div class="log-entry info">Admin interface ready. Load configuration to start.</div>
+                </div>
+                
+                <button class="btn secondary" onclick="clearLog()">Clear Log</button>
+                <button class="btn secondary" onclick="exportLog()">Export Log</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Admin application state
+        const ADMIN = {
+            config: {
+                backendUrl: '',
+                folderId: '',
+                apiToken: ''
+            },
+            processing: false
+        };
+
+        // Logging functions
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('logArea');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logArea.appendChild(entry);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('logArea').innerHTML = '';
+            log('Log cleared');
+        }
+
+        function exportLog() {
+            const logArea = document.getElementById('logArea');
+            const logs = Array.from(logArea.children).map(entry => entry.textContent).join('\n');
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `photo-mapper-admin-log-${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            log('Log exported');
+        }
+
+        // Configuration management
+        function loadConfig() {
+            try {
+                const saved = localStorage.getItem('photoMapperAdminConfig');
+                if (saved) {
+                    ADMIN.config = { ...ADMIN.config, ...JSON.parse(saved) };
+                }
+                
+                document.getElementById('backendUrl').value = ADMIN.config.backendUrl;
+                document.getElementById('folderId').value = ADMIN.config.folderId;
+                document.getElementById('apiToken').value = ADMIN.config.apiToken;
+                document.getElementById('notificationEmail').value = ADMIN.config.notificationEmail || '';
+                
+                log('Configuration loaded');
+                
+                if (ADMIN.config.backendUrl) {
+                    refreshStats();
+                }
+                
+            } catch (e) {
+                log('Error loading configuration: ' + e.message, 'error');
+            }
+        }
+
+        function saveConfig() {
+            try {
+                ADMIN.config = {
+                    backendUrl: document.getElementById('backendUrl').value.trim(),
+                    folderId: document.getElementById('folderId').value.trim(),
+                    apiToken: document.getElementById('apiToken').value.trim(),
+                    notificationEmail: document.getElementById('notificationEmail').value.trim()
+                };
+                
+                localStorage.setItem('photoMapperAdminConfig', JSON.stringify(ADMIN.config));
+                log('Configuration saved');
+                
+            } catch (e) {
+                log('Error saving configuration: ' + e.message, 'error');
+            }
+        }
+
+        // API request helper
+        async function makeAdminRequest(action, additionalParams = {}) {
+            if (!ADMIN.config.backendUrl) {
+                throw new Error('Backend URL not configured');
+            }
+            
+            const url = new URL(ADMIN.config.backendUrl);
+            url.searchParams.set('route', 'admin');
+            url.searchParams.set('action', action);
+            
+            if (ADMIN.config.folderId) {
+                url.searchParams.set('folderId', ADMIN.config.folderId);
+            }
+            
+            if (ADMIN.config.apiToken) {
+                url.searchParams.set('token', ADMIN.config.apiToken);
+            }
+            
+            Object.keys(additionalParams).forEach(key => {
+                url.searchParams.set(key, additionalParams[key]);
+            });
+            
+            const response = await fetch(url.toString());
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            return data;
+        }
+
+        // Admin operations
+        async function initializeDatabase() {
+            try {
+                log('Initializing database...');
+                const result = await makeAdminRequest('init');
+                log(`Database initialized: ${result.spreadsheetId}`, 'success');
+                refreshStats();
+            } catch (error) {
+                log('Database initialization failed: ' + error.message, 'error');
+            }
+        }
+
+        async function processPhotos() {
+            if (ADMIN.processing) {
+                log('Processing already in progress', 'error');
+                return;
+            }
+            
+            try {
+                ADMIN.processing = true;
+                showProgress(true);
+                log('Starting photo processing...');
+                
+                const result = await makeAdminRequest('process');
+                
+                log(`Processing completed: ${result.filesProcessed} processed, ${result.filesWithGPS} with GPS`, 'success');
+                refreshStats();
+                
+            } catch (error) {
+                log('Photo processing failed: ' + error.message, 'error');
+            } finally {
+                ADMIN.processing = false;
+                showProgress(false);
+            }
+        }
+
+        async function incrementalProcess() {
+            try {
+                log('Starting incremental processing...');
+                const result = await makeAdminRequest('incremental');
+                log(`Incremental processing completed: ${result.filesProcessed} processed`, 'success');
+                refreshStats();
+            } catch (error) {
+                log('Incremental processing failed: ' + error.message, 'error');
+            }
+        }
+
+        async function reprocessPhotos() {
+            if (!confirm('This will reprocess all photos. Continue?')) {
+                return;
+            }
+            
+            try {
+                ADMIN.processing = true;
+                showProgress(true);
+                log('Starting reprocessing...');
+                
+                const result = await makeAdminRequest('reprocess');
+                log(`Reprocessing completed: ${result.filesProcessed} processed`, 'success');
+                refreshStats();
+                
+            } catch (error) {
+                log('Reprocessing failed: ' + error.message, 'error');
+            } finally {
+                ADMIN.processing = false;
+                showProgress(false);
+            }
+        }
+
+        async function cleanupDatabase() {
+            try {
+                log('Starting database cleanup...');
+                const result = await makeAdminRequest('cleanup');
+                log(`Cleanup completed: ${result.removed} entries removed`, 'success');
+                refreshStats();
+            } catch (error) {
+                log('Database cleanup failed: ' + error.message, 'error');
+            }
+        }
+
+        async function clearCache() {
+            try {
+                log('Clearing cache...');
+                await makeAdminRequest('clear-cache');
+                log('Cache cleared successfully', 'success');
+            } catch (error) {
+                log('Clear cache failed: ' + error.message, 'error');
+            }
+        }
+
+        // Automation functions
+        async function setupAutomation() {
+            try {
+                log('Setting up automation system...');
+                
+                // First save the notification email if provided
+                if (ADMIN.config.notificationEmail) {
+                    await setNotificationEmail(ADMIN.config.notificationEmail);
+                }
+                
+                const result = await makeAdminRequest('setup-automation');
+                log(`Automation setup completed: ${result.triggers} triggers created`, 'success');
+                
+                updateAutomationStatus();
+                showAutomationSchedule();
+                
+            } catch (error) {
+                log('Automation setup failed: ' + error.message, 'error');
+            }
+        }
+
+        async function testAutomation() {
+            try {
+                log('Testing automation system...');
+                const result = await makeAdminRequest('test-automation');
+                
+                if (result.success) {
+                    log('Automation test completed successfully', 'success');
+                } else {
+                    log('Automation test failed: ' + result.error, 'error');
+                }
+                
+            } catch (error) {
+                log('Automation test failed: ' + error.message, 'error');
+            }
+        }
+
+        async function clearAutomation() {
+            if (!confirm('This will remove all automated triggers. Continue?')) {
+                return;
+            }
+            
+            try {
+                log('Clearing automation triggers...');
+                await makeAdminRequest('clear-automation');
+                log('All automation triggers cleared', 'success');
+                
+                updateAutomationStatus();
+                
+            } catch (error) {
+                log('Clear automation failed: ' + error.message, 'error');
+            }
+        }
+
+        async function checkHealth() {
+            try {
+                log('Running health check...');
+                const result = await makeAdminRequest('health-check');
+                
+                if (result.overall === 'healthy') {
+                    log('System health check: All systems healthy', 'success');
+                } else {
+                    log(`Health check found issues: ${result.issues.join(', ')}`, 'warning');
+                }
+                
+            } catch (error) {
+                log('Health check failed: ' + error.message, 'error');
+            }
+        }
+
+        async function setNotificationEmail(email) {
+            try {
+                await makeAdminRequest('set-notification-email', { email: email });
+                log(`Notification email set to: ${email}`);
+            } catch (error) {
+                log('Failed to set notification email: ' + error.message, 'error');
+            }
+        }
+
+        function updateAutomationStatus() {
+            // This would need to be implemented to check current automation status
+            const statusDiv = document.getElementById('automationStatus');
+            statusDiv.style.display = 'block';
+            
+            document.getElementById('automationStatusText').textContent = 'Active';
+            document.getElementById('triggerCount').textContent = '4';
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
+        }
+
+        function showAutomationSchedule() {
+            // Add automation schedule information to the log
+            log('Automation Schedule:');
+            log('- Incremental Processing: Every 15 minutes');
+            log('- Health Checks: Every hour');
+            log('- Daily Cleanup: 2:00 AM daily');
+            log('- Monitoring Reports: Every 6 hours');
+        }
+
+        async function refreshStats() {
+            try {
+                const stats = await makeAdminRequest('stats');
+                
+                document.getElementById('dbStatus').textContent = stats.error ? 'Error' : 'Connected';
+                document.getElementById('totalPhotos').textContent = stats.totalPhotos || 0;
+                document.getElementById('gpsPhotos').textContent = stats.photosWithGPS || 0;
+                
+                const rate = stats.totalPhotos > 0 ? 
+                    Math.round((stats.photosWithGPS / stats.totalPhotos) * 100) : 0;
+                document.getElementById('processingRate').textContent = rate + '%';
+                
+                log('Statistics updated');
+                
+            } catch (error) {
+                log('Failed to refresh statistics: ' + error.message, 'error');
+                document.getElementById('dbStatus').textContent = 'Error';
+            }
+        }
+
+        function showProgress(show) {
+            const progressBar = document.getElementById('processProgress');
+            if (show) {
+                progressBar.style.display = 'block';
+                // Simple progress animation
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += Math.random() * 10;
+                    if (progress >= 90) progress = 90;
+                    document.getElementById('progressFill').style.width = progress + '%';
+                }, 500);
+                
+                progressBar._interval = interval;
+            } else {
+                progressBar.style.display = 'none';
+                if (progressBar._interval) {
+                    clearInterval(progressBar._interval);
+                }
+                document.getElementById('progressFill').style.width = '100%';
+                setTimeout(() => {
+                    document.getElementById('progressFill').style.width = '0%';
+                }, 1000);
+            }
+        }
+
+        // Initialize admin interface
+        function init() {
+            loadConfig();
+            log('Photo Mapper Admin Interface initialized');
+        }
+
+        // Start the admin interface
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>

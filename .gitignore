@@ -1,0 +1,69 @@
+# Photo Mapper - Git Ignore File
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build artifacts
+dist/
+build/
+out/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Node modules (if using any JS tools)
+node_modules/
+
+# Security files (if any)
+.htaccess
+.htpasswd
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Local configuration overrides
+config.local.js
+settings.local.json
+
+# Database files (if any local testing)
+*.sqlite
+*.db
+
+# Test coverage
+coverage/
+.nyc_output/
