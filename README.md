@@ -64,12 +64,15 @@ Cached → Location Query → JSON Response → OpenStreetMap
 ## Quick Start
 
 ### 🚀 Deploy to GitHub Pages (5 minutes)
-1. **Fork this repository** on GitHub
+
+[![Deploy to GitHub Pages](https://img.shields.io/badge/Deploy-GitHub%20Pages-blue.svg?style=for-the-badge&logo=github)](https://github.com/yourusername/photo-mapper/fork)
+
+1. **Fork this repository** on GitHub (click badge above)
 2. **Enable GitHub Pages**: Repository Settings → Pages → Source: `/web` folder
 3. **Deploy Apps Script**: Copy files from `apps-script/` to [script.google.com](https://script.google.com)
 4. **Access your app**: `https://yourusername.github.io/photo-mapper/`
 
-See [GitHub Deployment Guide](docs/GITHUB_DEPLOYMENT.md) for detailed instructions.
+📖 **Detailed Instructions**: [Complete GitHub Setup Guide](GITHUB_SETUP.md)
 
 ### Prerequisites
 - Google account with access to Drive, Gmail, and Apps Script
