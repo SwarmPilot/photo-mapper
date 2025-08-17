@@ -12,7 +12,8 @@ const AUTOMATION_CONFIG = {
   CLEANUP_INTERVAL: 1440,        // Daily cleanup (24 hours)
   HEALTH_CHECK_INTERVAL: 1,     // Health check every hour
   MONITORING_INTERVAL: 6,      // Send monitoring report every 6 hours
-  
+  GMAIL_MONITORING_INTERVAL: 15, // Monitor GMail every 15 minutes
+
   // Processing limits
   MAX_FILES_PER_RUN: 100,        // Limit processing to avoid timeouts
   MAX_EXECUTION_TIME: 300000,    // 5 minutes max execution (Apps Script limit is 6)
@@ -66,14 +67,21 @@ function setupAutomation() {
              .timeBased()
              .everyHours(AUTOMATION_CONFIG.MONITORING_INTERVAL)
              .create();
-    
+
+    // Create GMail to Drive trigger
+    ScriptApp.newTrigger('processPhotoEmails')
+             .timeBased()
+             .everyMinutes(AUTOMATION_CONFIG.GMAIL_MONITORING_INTERVAL)
+             .create();
+
+
     // Create Drive file change trigger (if possible)
     try {
       setupDriveChangeTrigger();
     } catch (e) {
       console.warn('Could not setup Drive change trigger:', e.message);
     }
-    
+      
     // Log automation setup
     const setupInfo = {
       timestamp: new Date().toISOString(),

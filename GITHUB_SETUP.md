@@ -38,7 +38,7 @@ This guide shows you exactly how to get Photo Mapper running on GitHub Pages in 
 3. **Scroll down to "Pages"** section
 4. **Under "Source"**, select **"Deploy from a branch"**
 5. **Select branch**: `main` (or `master`)
-6. **Select folder**: `/web` ⚠️ **Important: Must be `/web`**
+6. **Select folder**: `/web` ⚠️h **Important: Must be `/web`**
 7. **Click "Save"**
 
 ![GitHub Pages Setup](https://docs.github.com/assets/cb-20691/images/help/pages/source-setting-pages.png)
