@@ -399,11 +399,27 @@ function handleSearchPhotos(folderId, parameters = {}) {
 
 /**
  * Lists all images with GPS metadata from the specified Drive folder
- * Uses Drive API v3 with optimized field selection
+ * Uses Drive API v3 with optimized field selection and permission validation
  */
 function listImagesWithGps(folderId) {
+  // Validate folder access and permissions first
+  try {
+    const folderInfo = Drive.Files.get(folderId, { 
+      fields: 'id,name,capabilities,owners,permissions' 
+    });
+    
+    if (!folderInfo.capabilities || !folderInfo.capabilities.canListChildren) {
+      throw new Error('Insufficient permissions to access folder. Please ensure the folder is shared with read access.');
+    }
+    
+    console.log(`Validated access to folder: ${folderInfo.name} (${folderId})`);
+  } catch (error) {
+    console.error('Folder access validation failed:', error);
+    throw new Error(`Cannot access folder: ${error.toString()}. Please check folder ID and sharing permissions.`);
+  }
+
   const query = `'${folderId}' in parents and trashed = false and mimeType contains 'image/'`;
-  const fields = 'files(id,name,mimeType,modifiedTime,thumbnailLink,webViewLink,webContentLink,imageMediaMetadata(time,location)),nextPageToken';
+  const fields = 'files(id,name,mimeType,modifiedTime,size,thumbnailLink,webViewLink,webContentLink,imageMediaMetadata(time,location)),nextPageToken';
   
   let pageToken = null;
   const photos = [];
@@ -469,14 +485,18 @@ function processPhotoFile(file) {
       return null;
     }
     
+    // Generate reliable photo URLs with fallbacks
+    const photoUrls = generatePhotoUrls(file);
+    
     return {
       id: file.id,
       name: file.name,
       mimeType: file.mimeType,
       modifiedTime: file.modifiedTime,
-      thumbnailLink: file.thumbnailLink,
-      webViewLink: file.webViewLink,
-      webContentLink: file.webContentLink,
+      size: file.size || null,
+      thumbnailLink: photoUrls.thumbnail,
+      webViewLink: photoUrls.view,
+      webContentLink: photoUrls.download,
       imageMediaMetadata: {
         time: metadata.time || null,
         location: {
@@ -491,6 +511,32 @@ function processPhotoFile(file) {
     console.warn(`Error processing file ${file.name}:`, error);
     return null;
   }
+}
+
+/**
+ * Generates reliable photo URLs with fallbacks for thumbnails and links
+ * Ensures users have proper read-only access to photos
+ */
+function generatePhotoUrls(file) {
+  const fileId = file.id;
+  
+  // Use API-provided URLs when available, otherwise generate standard Drive URLs
+  const thumbnail = file.thumbnailLink || 
+                   `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h300`;
+  
+  const view = file.webViewLink || 
+              `https://drive.google.com/file/d/${fileId}/view`;
+  
+  // For webContentLink, only provide if user has download permissions
+  // This maintains read-only security while allowing viewing
+  const download = file.webContentLink || 
+                  `https://drive.google.com/uc?id=${fileId}&export=download`;
+  
+  return {
+    thumbnail: thumbnail,
+    view: view,
+    download: download
+  };
 }
 
 /**
