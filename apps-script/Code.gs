@@ -267,13 +267,16 @@ function handleAdminRequest(parameters = {}) {
           timestamp: new Date().toISOString()
         });
         
+      case 'cleanup-no-gps':
+        return handleCleanupNoGpsImages(parameters, folderId);
+        
       default:
         return createJsonResponse(400, { 
           error: 'Invalid admin action',
           available: [
             'init', 'process', 'reprocess', 'incremental', 'cleanup', 'stats', 'clear-cache', 
             'setup-automation', 'test-automation', 'clear-automation', 'health-check', 
-            'set-notification-email', 'status'
+            'set-notification-email', 'status', 'cleanup-no-gps'
           ]
         });
     }
@@ -511,6 +514,184 @@ function processPhotoFile(file) {
     console.warn(`Error processing file ${file.name}:`, error);
     return null;
   }
+}
+
+/**
+ * Handles cleanup of images without GPS data from Drive folder
+ * Supports dry-run mode for safety and detailed reporting
+ */
+function handleCleanupNoGpsImages(parameters = {}, folderId) {
+  try {
+    const dryRun = (parameters.dryRun || 'true').toString() === 'true';
+    const batchSize = parseInt(parameters.batchSize || '50');
+    const maxFiles = parseInt(parameters.maxFiles || '500');
+    
+    console.log(`Starting GPS cleanup - Folder: ${folderId}, DryRun: ${dryRun}, BatchSize: ${batchSize}`);
+    
+    if (!folderId) {
+      return createJsonResponse(400, { error: 'Folder ID is required for cleanup operation' });
+    }
+    
+    // Validate folder access
+    try {
+      const folderInfo = Drive.Files.get(folderId, { fields: 'id,name,capabilities' });
+      if (!dryRun && (!folderInfo.capabilities || !folderInfo.capabilities.canDelete)) {
+        return createJsonResponse(403, { 
+          error: 'Insufficient permissions to delete files from folder',
+          folderName: folderInfo.name
+        });
+      }
+    } catch (error) {
+      return createJsonResponse(404, { error: `Folder not found or not accessible: ${error.toString()}` });
+    }
+    
+    const results = findAndProcessNoGpsImages(folderId, dryRun, batchSize, maxFiles);
+    
+    return createJsonResponse(200, {
+      success: true,
+      dryRun: dryRun,
+      summary: results.summary,
+      files: results.files,
+      completed: results.completed,
+      hasMore: results.hasMore,
+      nextPageToken: results.nextPageToken || null,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('GPS cleanup error:', error);
+    return createJsonResponse(500, { 
+      error: 'GPS cleanup failed',
+      message: error.toString()
+    });
+  }
+}
+
+/**
+ * Finds and optionally removes images without GPS data
+ */
+function findAndProcessNoGpsImages(folderId, dryRun = true, batchSize = 50, maxFiles = 500) {
+  const query = `'${folderId}' in parents and trashed = false and mimeType contains 'image/'`;
+  const fields = 'files(id,name,mimeType,size,modifiedTime,imageMediaMetadata(location)),nextPageToken';
+  
+  let pageToken = null;
+  let totalProcessed = 0;
+  let noGpsFiles = [];
+  let deletedFiles = [];
+  let errors = [];
+  
+  do {
+    try {
+      const requestParams = {
+        q: query,
+        fields: fields,
+        pageSize: Math.min(batchSize, maxFiles - totalProcessed),
+        pageToken: pageToken
+      };
+      
+      const response = Drive.Files.list(requestParams);
+      
+      if (response.files) {
+        for (const file of response.files) {
+          totalProcessed++;
+          
+          // Check if file has GPS data
+          const hasGpsData = file.imageMediaMetadata && 
+                           file.imageMediaMetadata.location &&
+                           typeof file.imageMediaMetadata.location.latitude === 'number' &&
+                           typeof file.imageMediaMetadata.location.longitude === 'number';
+          
+          if (!hasGpsData) {
+            const fileInfo = {
+              id: file.id,
+              name: file.name,
+              mimeType: file.mimeType,
+              size: file.size || 0,
+              modifiedTime: file.modifiedTime,
+              reason: getNoGpsReason(file)
+            };
+            
+            noGpsFiles.push(fileInfo);
+            
+            // Actually delete the file if not in dry-run mode
+            if (!dryRun) {
+              try {
+                Drive.Files.remove(file.id);
+                deletedFiles.push(fileInfo);
+                console.log(`Deleted file without GPS: ${file.name} (${file.id})`);
+              } catch (deleteError) {
+                console.error(`Failed to delete ${file.name}:`, deleteError);
+                errors.push({
+                  file: fileInfo,
+                  error: deleteError.toString()
+                });
+              }
+            }
+          }
+          
+          // Stop if we've reached the maximum file limit
+          if (totalProcessed >= maxFiles) {
+            break;
+          }
+        }
+      }
+      
+      pageToken = response.nextPageToken;
+      
+      // Stop if we've reached the maximum file limit
+      if (totalProcessed >= maxFiles) {
+        break;
+      }
+      
+    } catch (error) {
+      console.error('Error processing batch:', error);
+      errors.push({
+        batch: true,
+        error: error.toString()
+      });
+      break;
+    }
+    
+  } while (pageToken);
+  
+  const summary = {
+    totalProcessed: totalProcessed,
+    imagesWithoutGps: noGpsFiles.length,
+    filesDeleted: deletedFiles.length,
+    errors: errors.length,
+    totalSizeCleaned: dryRun ? 
+      noGpsFiles.reduce((sum, f) => sum + (f.size || 0), 0) :
+      deletedFiles.reduce((sum, f) => sum + (f.size || 0), 0)
+  };
+  
+  return {
+    summary: summary,
+    files: dryRun ? noGpsFiles : deletedFiles,
+    errors: errors,
+    completed: !pageToken || totalProcessed >= maxFiles,
+    hasMore: !!pageToken && totalProcessed < maxFiles,
+    nextPageToken: pageToken
+  };
+}
+
+/**
+ * Determines why a file doesn't have GPS data
+ */
+function getNoGpsReason(file) {
+  if (!file.imageMediaMetadata) {
+    return 'No image metadata available';
+  }
+  
+  if (!file.imageMediaMetadata.location) {
+    return 'No location data in metadata';
+  }
+  
+  const location = file.imageMediaMetadata.location;
+  if (typeof location.latitude !== 'number' || typeof location.longitude !== 'number') {
+    return 'Invalid or missing latitude/longitude coordinates';
+  }
+  
+  return 'Unknown reason';
 }
 
 /**
