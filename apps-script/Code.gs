@@ -28,7 +28,7 @@ const CFG = (() => {
  * Main entry point for Web App GET requests
  * Supports routes: /search, /admin, /health, and legacy /list
  */
-function doGet(e) {
+async function doGet(e) {
   try {
     // Extract parameters
     const route = (e?.parameter?.route || 'search').toString(); // Default to search now
@@ -55,7 +55,7 @@ function doGet(e) {
     }
     
     if (route === 'admin') {
-      return handleAdminRequest(e.parameter);
+      return await handleAdminRequest(e.parameter);
     }
     
     if (route === 'list') {
@@ -185,7 +185,7 @@ function handleDatabaseSearch(parameters = {}) {
 /**
  * Handles admin requests for database management
  */
-function handleAdminRequest(parameters = {}) {
+async function handleAdminRequest(parameters = {}) {
   try {
     const action = (parameters.action || '').toString();
     const folderId = (parameters.folderId || CFG.FOLDER_ID).toString();
@@ -271,7 +271,7 @@ function handleAdminRequest(parameters = {}) {
         return handleCleanupNoGpsImages(parameters, folderId);
         
       case 'categorize-photos':
-        return handleCategorizePhotos(parameters, folderId);
+        return await handleCategorizePhotos(parameters, folderId);
         
       case 'get-categories':
         return handleGetCategories();
@@ -703,7 +703,7 @@ function getNoGpsReason(file) {
 /**
  * Handles photo categorization requests
  */
-function handleCategorizePhotos(parameters = {}, folderId) {
+async function handleCategorizePhotos(parameters = {}, folderId) {
   try {
     const mode = (parameters.mode || 'preview').toString();
     const batchSize = parseInt(parameters.batchSize || '20');
@@ -752,7 +752,7 @@ function handleCategorizePhotos(parameters = {}, folderId) {
     }
     
     // Actually categorize photos
-    const results = processCategorization(photos.slice(0, maxPhotos), batchSize);
+    const results = await processCategorization(photos.slice(0, maxPhotos), batchSize);
     
     return createJsonResponse(200, {
       success: true,
@@ -797,7 +797,7 @@ function getPhotosForCategorization(folderId, maxPhotos, recategorize = false) {
 /**
  * Processes photo categorization in batches
  */
-function processCategorization(photos, batchSize) {
+async function processCategorization(photos, batchSize) {
   const results = {
     summary: {
       totalPhotos: photos.length,
@@ -818,8 +818,20 @@ function processCategorization(photos, batchSize) {
       
       for (const photo of batch) {
         try {
+          console.log(`Processing photo: ${photo?.name || 'unnamed'} (ID: ${photo?.id || 'no-id'})`);
+          
           // Categorize the photo
-          const categories = categorizePhoto(photo);
+          const categories = await categorizePhoto(photo);
+          
+          // Ensure categories has the expected structure
+          if (!categories || typeof categories !== 'object') {
+            throw new Error('Invalid categorization result');
+          }
+          
+          // Ensure primary array exists
+          if (!Array.isArray(categories.primary)) {
+            categories.primary = ['uncategorized'];
+          }
           
           // Update photo in database with categorization
           const updatedPhoto = {
@@ -827,8 +839,8 @@ function processCategorization(photos, batchSize) {
             categories: categories,
             categorized: new Date().toISOString(),
             primaryCategory: categories.primary[0] || 'uncategorized',
-            timeCategory: categories.time,
-            seasonCategory: categories.season
+            timeCategory: categories.time || null,
+            seasonCategory: categories.season || null
           };
           
           // Store in database

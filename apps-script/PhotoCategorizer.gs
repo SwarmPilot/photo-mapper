@@ -114,6 +114,15 @@ const CATEGORY_CONFIG = {
  */
 async function categorizePhoto(photoData) {
   try {
+    // Validate input
+    if (!photoData || typeof photoData !== 'object') {
+      throw new Error('Invalid photo data provided');
+    }
+    
+    if (!photoData.name) {
+      throw new Error('Photo data missing required name field');
+    }
+    
     console.log(`Categorizing photo: ${photoData.name}`);
     
     const categories = {
@@ -162,7 +171,7 @@ async function categorizePhoto(photoData) {
     return finalCategories;
     
   } catch (error) {
-    console.error(`Error categorizing photo ${photoData.name}:`, error);
+    console.error(`Error categorizing photo ${photoData?.name || 'unknown'}:`, error);
     return {
       primary: ['uncategorized'],
       secondary: [],
