@@ -239,6 +239,68 @@
             color: white;
         }
         
+        /* Category Filter Styles */
+        .category-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .category-section h4 {
+            color: var(--primary-color);
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+        }
+        
+        .category-checkboxes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.5rem;
+        }
+        
+        .category-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            background: #f9fafb;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .category-checkbox:hover {
+            background: #f3f4f6;
+            border-color: var(--primary-color);
+        }
+        
+        .category-checkbox.selected {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: var(--primary-color);
+        }
+        
+        .category-checkbox input[type="checkbox"] {
+            margin: 0;
+        }
+        
+        .category-icon {
+            font-size: 1.2rem;
+        }
+        
+        .category-label {
+            flex: 1;
+            font-size: 0.875rem;
+            color: #374151;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e5e7eb;
+        }
+        
         /* Permission help modal */
         .permission-help-modal {
             position: fixed;
@@ -568,6 +630,43 @@
     </style>
 </head>
 <body>
+    <!-- Category Filter Modal -->
+    <div id="categoryModal" class="startup-modal hidden">
+        <div class="startup-content">
+            <h2>🏷️ Filter by Categories</h2>
+            <p>Select categories to filter your photos. Leave empty to show all photos.</p>
+            
+            <div id="categoryFilters">
+                <div class="category-section">
+                    <h4>📸 Content Categories</h4>
+                    <div id="contentCategories" class="category-checkboxes">
+                        <!-- Content categories will be populated here -->
+                    </div>
+                </div>
+                
+                <div class="category-section">
+                    <h4>🕐 Time Categories</h4>
+                    <div id="timeCategories" class="category-checkboxes">
+                        <!-- Time categories will be populated here -->
+                    </div>
+                </div>
+                
+                <div class="category-section">
+                    <h4>🌿 Season Categories</h4>
+                    <div id="seasonCategories" class="category-checkboxes">
+                        <!-- Season categories will be populated here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn secondary" onclick="clearCategoryFilters()">Clear All</button>
+                <button class="btn secondary" onclick="closeCategoryModal()">Cancel</button>
+                <button class="btn primary" onclick="applyCategoryFilters()">Apply Filters</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Startup Location Modal -->
     <div id="startupModal" class="startup-modal">
         <div class="startup-content">
@@ -616,6 +715,7 @@
             <button id="refreshBtn" class="btn btn-primary">Refresh</button>
             <button id="changeLocationBtn" class="btn">📍 Change Location</button>
             <button id="viewportBtn" class="btn">🔍 Search Area</button>
+            <button id="categoriesBtn" class="btn">🏷️ Categories</button>
             <button id="adminBtn" class="btn">📊 Admin</button>
             <div style="position: relative;">
                 <button id="configBtn" class="btn">⚙️ Config</button>
@@ -678,6 +778,12 @@
                 backendUrl: '',
                 folderId: '',
                 apiToken: ''
+            },
+            categories: {},
+            selectedCategories: {
+                content: [],
+                time: null,
+                season: null
             }
         };
 
@@ -1801,6 +1907,9 @@
                     panel.classList.remove('show');
                 }
             });
+            
+            // Category filter button
+            document.getElementById('categoriesBtn').addEventListener('click', toggleCategoryFilter);
 
             // Save config and reload photos
             document.getElementById('saveConfigBtn').addEventListener('click', () => {
@@ -1962,6 +2071,208 @@
         }
 
         // Start the application when DOM is ready
+        // Category filtering functions
+        async function toggleCategoryFilter() {
+            const modal = document.getElementById('categoryModal');
+            
+            if (modal.classList.contains('hidden')) {
+                await loadAvailableCategories();
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+        
+        async function loadAvailableCategories() {
+            if (!APP.config.backendUrl) {
+                setStatus('Configure backend URL first', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${APP.config.backendUrl}?route=admin&action=get-categories${APP.config.apiToken ? `&token=${APP.config.apiToken}` : ''}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    APP.categories = result.categories;
+                    populateCategoryModal();
+                }
+            } catch (error) {
+                setStatus(`Error loading categories: ${error.message}`, 'error');
+            }
+        }
+        
+        function populateCategoryModal() {
+            const contentDiv = document.getElementById('contentCategories');
+            const timeDiv = document.getElementById('timeCategories');
+            const seasonDiv = document.getElementById('seasonCategories');
+            
+            contentDiv.innerHTML = '';
+            timeDiv.innerHTML = '';
+            seasonDiv.innerHTML = '';
+            
+            for (const [id, category] of Object.entries(APP.categories)) {
+                const checkbox = createCategoryCheckbox(id, category);
+                
+                if (category.type === 'time') {
+                    timeDiv.appendChild(checkbox);
+                } else if (category.type === 'season') {
+                    seasonDiv.appendChild(checkbox);
+                } else {
+                    contentDiv.appendChild(checkbox);
+                }
+            }
+        }
+        
+        function createCategoryCheckbox(id, category) {
+            const div = document.createElement('div');
+            div.className = 'category-checkbox';
+            
+            const isSelected = (category.type === 'content' && APP.selectedCategories.content.includes(id)) ||
+                              (category.type === 'time' && APP.selectedCategories.time === id) ||
+                              (category.type === 'season' && APP.selectedCategories.season === id);
+            
+            if (isSelected) div.classList.add('selected');
+            
+            div.innerHTML = `
+                <input type="checkbox" id="cat_${id}" ${isSelected ? 'checked' : ''}>
+                <span class="category-icon">${category.icon}</span>
+                <span class="category-label">${category.name}</span>
+            `;
+            
+            div.addEventListener('click', (e) => {
+                if (e.target.type !== 'checkbox') {
+                    const checkbox = div.querySelector('input[type="checkbox"]');
+                    checkbox.checked = !checkbox.checked;
+                }
+                
+                const isChecked = div.querySelector('input[type="checkbox"]').checked;
+                div.classList.toggle('selected', isChecked);
+                
+                if (category.type === 'time' || category.type === 'season') {
+                    const parentDiv = div.parentElement;
+                    parentDiv.querySelectorAll('.category-checkbox').forEach(otherDiv => {
+                        if (otherDiv !== div) {
+                            otherDiv.classList.remove('selected');
+                            otherDiv.querySelector('input[type="checkbox"]').checked = false;
+                        }
+                    });
+                }
+            });
+            
+            return div;
+        }
+        
+        function applyCategoryFilters() {
+            const contentCategories = [];
+            let timeCategory = null;
+            let seasonCategory = null;
+            
+            document.querySelectorAll('#contentCategories .category-checkbox.selected input:checked').forEach(input => {
+                contentCategories.push(input.id.replace('cat_', ''));
+            });
+            
+            const timeInput = document.querySelector('#timeCategories .category-checkbox.selected input:checked');
+            if (timeInput) timeCategory = timeInput.id.replace('cat_time_', '');
+            
+            const seasonInput = document.querySelector('#seasonCategories .category-checkbox.selected input:checked');
+            if (seasonInput) seasonCategory = seasonInput.id.replace('cat_season_', '');
+            
+            APP.selectedCategories = { content: contentCategories, time: timeCategory, season: seasonCategory };
+            
+            const categoryBtn = document.getElementById('categoriesBtn');
+            const hasFilters = contentCategories.length > 0 || timeCategory || seasonCategory;
+            
+            if (hasFilters) {
+                categoryBtn.style.background = 'var(--primary-color)';
+                categoryBtn.style.color = 'white';
+                categoryBtn.textContent = `🏷️ Categories (${contentCategories.length + (timeCategory ? 1 : 0) + (seasonCategory ? 1 : 0)})`;
+            } else {
+                categoryBtn.style.background = '';
+                categoryBtn.style.color = '';
+                categoryBtn.textContent = '🏷️ Categories';
+            }
+            
+            closeCategoryModal();
+            
+            if (APP.isLocationSet) {
+                loadPhotosWithCategoryFilters();
+            }
+        }
+        
+        function clearCategoryFilters() {
+            document.querySelectorAll('#categoryModal .category-checkbox').forEach(div => {
+                div.classList.remove('selected');
+                div.querySelector('input[type="checkbox"]').checked = false;
+            });
+            
+            APP.selectedCategories = { content: [], time: null, season: null };
+            
+            const categoryBtn = document.getElementById('categoriesBtn');
+            categoryBtn.style.background = '';
+            categoryBtn.style.color = '';
+            categoryBtn.textContent = '🏷️ Categories';
+        }
+        
+        function closeCategoryModal() {
+            document.getElementById('categoryModal').classList.add('hidden');
+        }
+        
+        async function loadPhotosWithCategoryFilters() {
+            if (!APP.config.backendUrl) return;
+            
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.textContent = 'Loading...';
+            refreshBtn.disabled = true;
+            setStatus('Loading filtered photos...', 'loading');
+            
+            try {
+                const url = new URL(APP.config.backendUrl);
+                url.searchParams.set('route', 'search');
+                
+                if (APP.autoLoadViewport && APP.viewportBounds) {
+                    url.searchParams.set('north', APP.viewportBounds.getNorth().toString());
+                    url.searchParams.set('south', APP.viewportBounds.getSouth().toString());
+                    url.searchParams.set('east', APP.viewportBounds.getEast().toString());
+                    url.searchParams.set('west', APP.viewportBounds.getWest().toString());
+                } else if (APP.selectedLocation) {
+                    url.searchParams.set('lat', APP.selectedLocation.latitude.toString());
+                    url.searchParams.set('lng', APP.selectedLocation.longitude.toString());
+                    url.searchParams.set('radius', APP.searchRadius.toString());
+                }
+                
+                if (APP.selectedCategories.content.length > 0) {
+                    url.searchParams.set('categories', APP.selectedCategories.content.join(','));
+                }
+                if (APP.selectedCategories.time) {
+                    url.searchParams.set('timeCategory', APP.selectedCategories.time);
+                }
+                if (APP.selectedCategories.season) {
+                    url.searchParams.set('seasonCategory', APP.selectedCategories.season);
+                }
+                
+                if (APP.config.folderId) url.searchParams.set('folderId', APP.config.folderId);
+                if (APP.config.apiToken) url.searchParams.set('token', APP.config.apiToken);
+                
+                const response = await fetch(url.toString());
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                
+                APP.photos = data.photos || [];
+                displayPhotosOnMap();
+                
+                setStatus(`Found ${APP.photos.length} photos with filters${data.cached ? ' (cached)' : ''}`, 'success');
+                
+            } catch (error) {
+                setStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                refreshBtn.textContent = 'Refresh';
+                refreshBtn.disabled = false;
+            }
+        }
+
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', init);
         } else {

@@ -270,13 +270,19 @@ function handleAdminRequest(parameters = {}) {
       case 'cleanup-no-gps':
         return handleCleanupNoGpsImages(parameters, folderId);
         
+      case 'categorize-photos':
+        return handleCategorizePhotos(parameters, folderId);
+        
+      case 'get-categories':
+        return handleGetCategories();
+        
       default:
         return createJsonResponse(400, { 
           error: 'Invalid admin action',
           available: [
             'init', 'process', 'reprocess', 'incremental', 'cleanup', 'stats', 'clear-cache', 
             'setup-automation', 'test-automation', 'clear-automation', 'health-check', 
-            'set-notification-email', 'status', 'cleanup-no-gps'
+            'set-notification-email', 'status', 'cleanup-no-gps', 'categorize-photos', 'get-categories'
           ]
         });
     }
@@ -695,6 +701,217 @@ function getNoGpsReason(file) {
 }
 
 /**
+ * Handles photo categorization requests
+ */
+function handleCategorizePhotos(parameters = {}, folderId) {
+  try {
+    const mode = (parameters.mode || 'preview').toString();
+    const batchSize = parseInt(parameters.batchSize || '20');
+    const maxPhotos = parseInt(parameters.maxPhotos || '100');
+    const recategorize = (parameters.recategorize || 'false').toString() === 'true';
+    
+    console.log(`Starting photo categorization - Mode: ${mode}, BatchSize: ${batchSize}, Max: ${maxPhotos}`);
+    
+    if (!folderId) {
+      return createJsonResponse(400, { error: 'Folder ID is required for categorization' });
+    }
+    
+    // Get photos to categorize
+    const photos = getPhotosForCategorization(folderId, maxPhotos, recategorize);
+    
+    if (photos.length === 0) {
+      return createJsonResponse(200, {
+        success: true,
+        mode: mode,
+        summary: {
+          totalFound: 0,
+          alreadyCategorized: 0,
+          processed: 0,
+          errors: 0
+        },
+        message: 'No photos found that need categorization'
+      });
+    }
+    
+    if (mode === 'preview') {
+      // Just return what would be processed
+      return createJsonResponse(200, {
+        success: true,
+        mode: 'preview',
+        summary: {
+          totalFound: photos.length,
+          wouldProcess: Math.min(photos.length, maxPhotos),
+          batchSize: batchSize
+        },
+        samplePhotos: photos.slice(0, 10).map(p => ({
+          id: p.id,
+          name: p.name,
+          currentCategory: p.primaryCategory || 'none'
+        }))
+      });
+    }
+    
+    // Actually categorize photos
+    const results = processCategorization(photos.slice(0, maxPhotos), batchSize);
+    
+    return createJsonResponse(200, {
+      success: true,
+      mode: 'execute',
+      summary: results.summary,
+      processed: results.processed,
+      errors: results.errors,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Photo categorization error:', error);
+    return createJsonResponse(500, { 
+      error: 'Photo categorization failed',
+      message: error.toString()
+    });
+  }
+}
+
+/**
+ * Gets photos that need categorization
+ */
+function getPhotosForCategorization(folderId, maxPhotos, recategorize = false) {
+  try {
+    // Get photos from database
+    const photos = getAllPhotosFromDatabase();
+    
+    if (recategorize) {
+      // Return all photos for re-categorization
+      return photos.slice(0, maxPhotos);
+    } else {
+      // Return only uncategorized photos
+      return photos.filter(photo => !photo.categorized || !photo.primaryCategory).slice(0, maxPhotos);
+    }
+    
+  } catch (error) {
+    console.error('Error getting photos for categorization:', error);
+    return [];
+  }
+}
+
+/**
+ * Processes photo categorization in batches
+ */
+function processCategorization(photos, batchSize) {
+  const results = {
+    summary: {
+      totalPhotos: photos.length,
+      processed: 0,
+      categorized: 0,
+      errors: 0,
+      startTime: new Date().toISOString()
+    },
+    processed: [],
+    errors: []
+  };
+  
+  try {
+    for (let i = 0; i < photos.length; i += batchSize) {
+      const batch = photos.slice(i, i + batchSize);
+      
+      console.log(`Processing categorization batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(photos.length/batchSize)}`);
+      
+      for (const photo of batch) {
+        try {
+          // Categorize the photo
+          const categories = categorizePhoto(photo);
+          
+          // Update photo in database with categorization
+          const updatedPhoto = {
+            ...photo,
+            categories: categories,
+            categorized: new Date().toISOString(),
+            primaryCategory: categories.primary[0] || 'uncategorized',
+            timeCategory: categories.time,
+            seasonCategory: categories.season
+          };
+          
+          // Store in database
+          storePhotoMetadata(updatedPhoto);
+          
+          results.processed.push({
+            id: photo.id,
+            name: photo.name,
+            primaryCategory: updatedPhoto.primaryCategory,
+            categories: categories
+          });
+          
+          results.summary.processed++;
+          results.summary.categorized++;
+          
+        } catch (error) {
+          console.error(`Failed to categorize photo ${photo.name}:`, error);
+          results.errors.push({
+            photoId: photo.id,
+            photoName: photo.name,
+            error: error.toString()
+          });
+          results.summary.errors++;
+        }
+        
+        // Small delay to avoid overwhelming the system
+        Utilities.sleep(100);
+      }
+      
+      // Longer pause between batches
+      if (i + batchSize < photos.length) {
+        Utilities.sleep(500);
+      }
+    }
+    
+    results.summary.endTime = new Date().toISOString();
+    const duration = new Date(results.summary.endTime).getTime() - new Date(results.summary.startTime).getTime();
+    results.summary.durationMs = duration;
+    
+    console.log(`Categorization completed: ${results.summary.categorized}/${results.summary.totalPhotos} photos categorized`);
+    
+    return results;
+    
+  } catch (error) {
+    console.error('Batch categorization error:', error);
+    results.errors.push({
+      batch: true,
+      error: error.toString()
+    });
+    return results;
+  }
+}
+
+/**
+ * Returns available categories and their configuration
+ */
+function handleGetCategories() {
+  try {
+    const categories = getAllCategories();
+    
+    return createJsonResponse(200, {
+      success: true,
+      categories: categories,
+      config: {
+        enableVisionAPI: CATEGORY_CONFIG.enableVisionAPI,
+        enableLocationContext: CATEGORY_CONFIG.enableLocationContext,
+        enableMetadataAnalysis: CATEGORY_CONFIG.enableMetadataAnalysis,
+        enableTimeAnalysis: CATEGORY_CONFIG.enableTimeAnalysis,
+        minimumConfidence: CATEGORY_CONFIG.minimumConfidence
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Get categories error:', error);
+    return createJsonResponse(500, { 
+      error: 'Failed to get categories',
+      message: error.toString()
+    });
+  }
+}
+
+/**
  * Generates reliable photo URLs with fallbacks for thumbnails and links
  * Ensures users have proper read-only access to photos
  */
@@ -765,7 +982,10 @@ function parseSearchParameters(parameters) {
     bounds: null,
     center: null,
     radius: null,
-    limit: null
+    limit: null,
+    categories: null, // Category filtering
+    timeCategory: null, // Time-based filtering
+    seasonCategory: null // Season-based filtering
   };
   
   // Bounding box search: ?bbox=north,south,east,west
@@ -803,6 +1023,21 @@ function parseSearchParameters(parameters) {
     };
   }
   
+  // Category filtering: ?categories=nature,urban,people
+  if (parameters.categories) {
+    params.categories = parameters.categories.toString().split(',').map(c => c.trim());
+  }
+  
+  // Time category filtering: ?timeCategory=morning
+  if (parameters.timeCategory) {
+    params.timeCategory = parameters.timeCategory.toString();
+  }
+  
+  // Season category filtering: ?seasonCategory=summer
+  if (parameters.seasonCategory) {
+    params.seasonCategory = parameters.seasonCategory.toString();
+  }
+  
   // Optional result limit (cap at max for performance)
   if (parameters.limit) {
     params.limit = Math.min(parseInt(parameters.limit), CFG.MAX_SEARCH_RESULTS);
@@ -817,32 +1052,52 @@ function parseSearchParameters(parameters) {
  * Create cache key for search parameters
  */
 function createSearchCacheKey(folderId, searchParams) {
-  const key = `search:${folderId}:${searchParams.type}`;
+  let key = `search:${folderId}:${searchParams.type}`;
   
   if (searchParams.type === 'bbox' || searchParams.type === 'viewport') {
     const b = searchParams.bounds;
-    return `${key}:${b.north.toFixed(4)},${b.south.toFixed(4)},${b.east.toFixed(4)},${b.west.toFixed(4)}`;
-  }
-  
-  if (searchParams.type === 'radius') {
+    key += `:${b.north.toFixed(4)},${b.south.toFixed(4)},${b.east.toFixed(4)},${b.west.toFixed(4)}`;
+  } else if (searchParams.type === 'radius') {
     const c = searchParams.center;
-    return `${key}:${c.latitude.toFixed(4)},${c.longitude.toFixed(4)},${searchParams.radius}`;
+    key += `:${c.latitude.toFixed(4)},${c.longitude.toFixed(4)},${searchParams.radius}`;
+  } else {
+    key += ':all';
   }
   
-  return `${key}:all`;
+  // Add category filters to cache key
+  if (searchParams.categories && searchParams.categories.length > 0) {
+    key += `:cat:${searchParams.categories.sort().join(',')}`;
+  }
+  
+  if (searchParams.timeCategory) {
+    key += `:time:${searchParams.timeCategory}`;
+  }
+  
+  if (searchParams.seasonCategory) {
+    key += `:season:${searchParams.seasonCategory}`;
+  }
+  
+  return key;
 }
 
 /**
- * Filter photos by location-based search parameters
+ * Filter photos by location and category search parameters
  */
 function filterPhotosByLocation(photos, searchParams) {
+  // First apply category filters if specified
+  let filteredPhotos = photos;
+  
+  if (searchParams.categories || searchParams.timeCategory || searchParams.seasonCategory) {
+    filteredPhotos = filterPhotosByCategories(photos, searchParams);
+  }
+  
   if (searchParams.type === 'all') {
-    return searchParams.limit ? photos.slice(0, searchParams.limit) : photos;
+    return searchParams.limit ? filteredPhotos.slice(0, searchParams.limit) : filteredPhotos;
   }
   
   let filtered = [];
   
-  for (const photo of photos) {
+  for (const photo of filteredPhotos) {
     const location = photo.imageMediaMetadata.location;
     const lat = location.latitude;
     const lng = location.longitude;
@@ -879,6 +1134,34 @@ function filterPhotosByLocation(photos, searchParams) {
   }
   
   return filtered;
+}
+
+/**
+ * Filter photos by category criteria
+ */
+function filterPhotosByCategories(photos, searchParams) {
+  return photos.filter(photo => {
+    // Check primary categories
+    if (searchParams.categories && searchParams.categories.length > 0) {
+      const photoCategories = photo.categories?.primary || [];
+      const hasMatchingCategory = searchParams.categories.some(searchCat => 
+        photoCategories.includes(searchCat) || photo.primaryCategory === searchCat
+      );
+      if (!hasMatchingCategory) return false;
+    }
+    
+    // Check time category
+    if (searchParams.timeCategory) {
+      if (photo.timeCategory !== searchParams.timeCategory) return false;
+    }
+    
+    // Check season category
+    if (searchParams.seasonCategory) {
+      if (photo.seasonCategory !== searchParams.seasonCategory) return false;
+    }
+    
+    return true;
+  });
 }
 
 /**

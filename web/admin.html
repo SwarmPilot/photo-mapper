@@ -435,6 +435,175 @@
             color: #92400e;
             font-size: 0.875rem;
         }
+        
+        /* Photo Categorization Styles */
+        .categorization-subsection {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid #22c55e;
+            border-radius: 0.5rem;
+        }
+        
+        .categorization-subsection h4 {
+            color: #16a34a;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+        
+        .categorization-controls {
+            margin-top: 1rem;
+        }
+        
+        .categorization-options {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        
+        .categorization-options label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: #374151;
+        }
+        
+        .categorization-buttons {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        
+        .categorization-results {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .category-card {
+            padding: 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            text-align: center;
+            background: #f9fafb;
+        }
+        
+        .category-card .category-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .category-card .category-name {
+            font-weight: bold;
+            color: #111827;
+            margin-bottom: 0.25rem;
+        }
+        
+        .category-card .category-count {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .categorization-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #f0fdf4;
+            border-radius: 0.375rem;
+        }
+        
+        .categorization-summary-item {
+            text-align: center;
+        }
+        
+        .categorization-summary-item .number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #16a34a;
+        }
+        
+        .categorization-summary-item .label {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .photo-category-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.875rem;
+        }
+        
+        .photo-category-item:last-child {
+            border-bottom: none;
+        }
+        
+        .photo-category-info {
+            flex: 1;
+        }
+        
+        .photo-category-name {
+            font-weight: 500;
+            color: #111827;
+            margin-bottom: 0.25rem;
+        }
+        
+        .photo-category-tags {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+        }
+        
+        .category-tag {
+            padding: 0.125rem 0.5rem;
+            background: #f3f4f6;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            color: #4b5563;
+        }
+        
+        .category-tag.primary {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        
+        .success-box {
+            background: #f0fdf4;
+            border: 1px solid #22c55e;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .success-box .success-title {
+            font-weight: bold;
+            color: #15803d;
+            margin-bottom: 0.5rem;
+        }
+        
+        .success-box .success-text {
+            color: #15803d;
+            font-size: 0.875rem;
+        }
     </style>
 </head>
 <body>
@@ -561,11 +730,50 @@
                         </div>
                     </div>
                     
-                    <div id="gpsCleanupResults" class="cleanup-results" style="display: none;">
+                                    <div id="gpsCleanupResults" class="cleanup-results" style="display: none;">
+                    <!-- Results will be populated here -->
+                </div>
+            </div>
+            
+            <div class="action-section">
+                <h3>🏷️ Photo Categorization</h3>
+                <p>Automatically categorize photos using AI analysis, metadata, and location context.</p>
+                
+                <div class="categorization-subsection">
+                    <h4>🤖 Smart Categorization</h4>
+                    <p>Analyze photos to automatically assign categories like Nature, Urban, People, Food, etc.</p>
+                    
+                    <div class="categorization-controls">
+                        <div class="categorization-options">
+                            <label>
+                                <input type="checkbox" id="previewCategorization" checked>
+                                <span>Preview Mode (Safe analysis without changes)</span>
+                            </label>
+                            <label>
+                                <input type="checkbox" id="recategorize">
+                                <span>Re-categorize already processed photos</span>
+                            </label>
+                            <label>
+                                Max photos to process:
+                                <input type="number" id="maxPhotosToProcess" value="50" min="10" max="500" style="width: 80px;">
+                            </label>
+                        </div>
+                        
+                        <div class="categorization-buttons">
+                            <button class="btn primary" onclick="previewCategorization()">🔍 Preview Categorization</button>
+                            <button class="btn success" onclick="executeCategorization()" id="executeCategoryBtn" disabled>
+                                🏷️ Categorize Photos
+                            </button>
+                            <button class="btn secondary" onclick="loadCategories()">📋 View Categories</button>
+                        </div>
+                    </div>
+                    
+                    <div id="categorizationResults" class="categorization-results" style="display: none;">
                         <!-- Results will be populated here -->
                     </div>
                 </div>
             </div>
+        </div>
             
             <div class="action-section">
                 <h3>📋 Activity Log</h3>
@@ -1146,6 +1354,302 @@
                     }
                 });
             }
+        }
+        
+        // Photo Categorization Functions
+        async function previewCategorization() {
+            const maxPhotos = parseInt(document.getElementById('maxPhotosToProcess').value) || 50;
+            const recategorize = document.getElementById('recategorize').checked;
+            
+            try {
+                log('🔍 Previewing photo categorization...');
+                
+                const result = await makeAdminRequest('categorize-photos', {
+                    mode: 'preview',
+                    maxPhotos: maxPhotos.toString(),
+                    recategorize: recategorize.toString()
+                });
+                
+                displayCategorizationResults(result, true);
+                
+                // Enable execute button if photos were found
+                const executeBtn = document.getElementById('executeCategoryBtn');
+                if (result.summary && result.summary.totalFound > 0) {
+                    executeBtn.disabled = false;
+                    executeBtn.textContent = `🏷️ Categorize ${result.summary.wouldProcess} Photos`;
+                } else {
+                    executeBtn.disabled = true;
+                    executeBtn.textContent = '🏷️ No Photos to Process';
+                }
+                
+                log(`✅ Preview completed: Found ${result.summary.totalFound} photos for categorization`);
+                
+            } catch (error) {
+                log(`❌ Preview failed: ${error.message}`, 'error');
+                console.error('Categorization preview error:', error);
+            }
+        }
+        
+        async function executeCategorization() {
+            const previewCheckbox = document.getElementById('previewCategorization');
+            const maxPhotos = parseInt(document.getElementById('maxPhotosToProcess').value) || 50;
+            const recategorize = document.getElementById('recategorize').checked;
+            
+            // Safety check for non-preview mode
+            if (!previewCheckbox.checked) {
+                const confirmed = confirm(
+                    '🤖 Start Photo Categorization?\n\n' +
+                    'This will analyze and categorize your photos using AI.\n' +
+                    'The process may take several minutes depending on the number of photos.\n\n' +
+                    'Continue?'
+                );
+                
+                if (!confirmed) {
+                    log('🛑 Categorization cancelled by user');
+                    return;
+                }
+            }
+            
+            const isPreview = previewCheckbox.checked;
+            
+            try {
+                log(isPreview ? '🔍 Running categorization preview...' : '🤖 Starting photo categorization...');
+                
+                const result = await makeAdminRequest('categorize-photos', {
+                    mode: isPreview ? 'preview' : 'execute',
+                    maxPhotos: maxPhotos.toString(),
+                    recategorize: recategorize.toString(),
+                    batchSize: '20'
+                });
+                
+                displayCategorizationResults(result, isPreview);
+                
+                if (!isPreview) {
+                    // Reset the execute button
+                    const executeBtn = document.getElementById('executeCategoryBtn');
+                    executeBtn.disabled = true;
+                    executeBtn.textContent = '🏷️ Categorize Photos';
+                    
+                    log(`✅ Categorization completed: ${result.summary.categorized} photos categorized`);
+                } else {
+                    log(`✅ Preview completed: ${result.summary.wouldProcess} photos would be categorized`);
+                }
+                
+            } catch (error) {
+                log(`❌ Categorization failed: ${error.message}`, 'error');
+                console.error('Categorization execution error:', error);
+            }
+        }
+        
+        async function loadCategories() {
+            try {
+                log('📋 Loading available categories...');
+                
+                const result = await makeAdminRequest('get-categories');
+                
+                displayAvailableCategories(result.categories);
+                
+                log(`✅ Loaded ${Object.keys(result.categories).length} categories`);
+                
+            } catch (error) {
+                log(`❌ Failed to load categories: ${error.message}`, 'error');
+                console.error('Load categories error:', error);
+            }
+        }
+        
+        function displayCategorizationResults(result, isPreview) {
+            const resultsDiv = document.getElementById('categorizationResults');
+            
+            if (!result.summary) {
+                resultsDiv.innerHTML = '<p>No results to display.</p>';
+                resultsDiv.style.display = 'block';
+                return;
+            }
+            
+            const summary = result.summary;
+            let html = '';
+            
+            // Success box for completion
+            if (!isPreview && summary.categorized > 0) {
+                html += `
+                    <div class="success-box">
+                        <div class="success-title">✅ Photos Categorized Successfully</div>
+                        <div class="success-text">
+                            ${summary.categorized} photos have been analyzed and categorized.
+                            Categories are now available for filtering and search.
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Summary statistics
+            html += `
+                <div class="categorization-summary">
+                    <div class="categorization-summary-item">
+                        <div class="number">${summary.totalFound || summary.totalPhotos || 0}</div>
+                        <div class="label">${isPreview ? 'Total Found' : 'Total Photos'}</div>
+                    </div>
+                    <div class="categorization-summary-item">
+                        <div class="number">${summary.wouldProcess || summary.processed || 0}</div>
+                        <div class="label">${isPreview ? 'Would Process' : 'Processed'}</div>
+                    </div>
+                    <div class="categorization-summary-item">
+                        <div class="number">${summary.categorized || 0}</div>
+                        <div class="label">Categorized</div>
+                    </div>
+                    <div class="categorization-summary-item">
+                        <div class="number">${summary.errors || 0}</div>
+                        <div class="label">Errors</div>
+                    </div>
+                </div>
+            `;
+            
+            // Sample photos or processed photos
+            if (result.samplePhotos && result.samplePhotos.length > 0) {
+                html += `
+                    <h4>${isPreview ? '📄 Sample Photos to Process:' : '🏷️ Sample Processed Photos:'}</h4>
+                    <div class="file-list">
+                `;
+                
+                result.samplePhotos.forEach(photo => {
+                    html += `
+                        <div class="photo-category-item">
+                            <div class="photo-category-info">
+                                <div class="photo-category-name">${photo.name}</div>
+                                <div class="photo-category-tags">
+                                    <span class="category-tag">${photo.currentCategory || 'none'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            }
+            
+            // Processed photos with categories
+            if (result.processed && result.processed.length > 0) {
+                html += `
+                    <h4>🏷️ Categorized Photos:</h4>
+                    <div class="file-list">
+                `;
+                
+                result.processed.slice(0, 20).forEach(photo => {
+                    const primaryTags = photo.categories?.primary || [];
+                    const secondaryTags = photo.categories?.secondary || [];
+                    
+                    html += `
+                        <div class="photo-category-item">
+                            <div class="photo-category-info">
+                                <div class="photo-category-name">${photo.name}</div>
+                                <div class="photo-category-tags">
+                                    ${primaryTags.map(tag => `<span class="category-tag primary">${tag}</span>`).join('')}
+                                    ${secondaryTags.slice(0, 3).map(tag => `<span class="category-tag">${tag}</span>`).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                if (result.processed.length > 20) {
+                    html += `<div class="photo-category-item"><em>... and ${result.processed.length - 20} more photos</em></div>`;
+                }
+                
+                html += '</div>';
+            }
+            
+            // Error reporting
+            if (result.errors && result.errors.length > 0) {
+                html += `
+                    <h4>❌ Errors (${result.errors.length}):</h4>
+                    <div class="file-list">
+                `;
+                
+                result.errors.forEach(error => {
+                    html += `
+                        <div class="photo-category-item">
+                            <div class="photo-category-info">
+                                <div class="photo-category-name">${error.photoName || 'System Error'}</div>
+                                <div class="file-reason">${error.error}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            }
+            
+            resultsDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+        }
+        
+        function displayAvailableCategories(categories) {
+            const resultsDiv = document.getElementById('categorizationResults');
+            
+            let html = `
+                <h4>📋 Available Categories</h4>
+                <div class="category-grid">
+            `;
+            
+            // Group categories by type
+            const contentCategories = [];
+            const timeCategories = [];
+            const seasonCategories = [];
+            
+            for (const [id, category] of Object.entries(categories)) {
+                if (category.type === 'time') {
+                    timeCategories.push(category);
+                } else if (category.type === 'season') {
+                    seasonCategories.push(category);
+                } else {
+                    contentCategories.push(category);
+                }
+            }
+            
+            // Display content categories
+            contentCategories.forEach(category => {
+                html += `
+                    <div class="category-card">
+                        <div class="category-icon">${category.icon}</div>
+                        <div class="category-name">${category.name}</div>
+                        <div class="category-count">Content Category</div>
+                    </div>
+                `;
+            });
+            
+            // Display time categories
+            timeCategories.forEach(category => {
+                html += `
+                    <div class="category-card">
+                        <div class="category-icon">${category.icon}</div>
+                        <div class="category-name">${category.name}</div>
+                        <div class="category-count">Time Category</div>
+                    </div>
+                `;
+            });
+            
+            // Display season categories
+            seasonCategories.forEach(category => {
+                html += `
+                    <div class="category-card">
+                        <div class="category-icon">${category.icon}</div>
+                        <div class="category-name">${category.name}</div>
+                        <div class="category-count">Season Category</div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            html += `
+                <p style="margin-top: 1rem; font-size: 0.875rem; color: #6b7280;">
+                    Categories are automatically assigned based on image analysis, metadata, location context, and timing.
+                    Use these categories to filter and organize your photo collection.
+                </p>
+            `;
+            
+            resultsDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
         }
 
         // Start the admin interface

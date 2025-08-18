@@ -79,7 +79,12 @@ function initializePhotosSheet(spreadsheet) {
       'webContentLink', // Drive download URL
       'folderId',     // Parent folder ID
       'processed',    // Processing timestamp
-      'checksum'      // File checksum for change detection
+      'checksum',     // File checksum for change detection
+      'categories',   // JSON string of categorization data
+      'categorized',  // Categorization timestamp
+      'primaryCategory', // Main category for quick filtering
+      'timeCategory', // Time-based category (morning, afternoon, etc.)
+      'seasonCategory' // Season category (spring, summer, etc.)
     ];
     
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
@@ -153,7 +158,12 @@ function storePhotoMetadata(photoData) {
       photoData.webContentLink || '',
       photoData.folderId || '',
       new Date().toISOString(),
-      photoData.checksum || ''
+      photoData.checksum || '',
+      photoData.categories ? JSON.stringify(photoData.categories) : '',
+      photoData.categorized || '',
+      photoData.primaryCategory || '',
+      photoData.timeCategory || '',
+      photoData.seasonCategory || ''
     ];
     
     if (existingRowIndex > 0) {
@@ -251,7 +261,12 @@ function searchPhotosByBounds(north, south, east, west, limit = 1000) {
           thumbnailLink: row[10],
           webViewLink: row[11],
           webContentLink: row[12],
-          folderId: row[13]
+          folderId: row[13],
+          categories: row[15] ? JSON.parse(row[15]) : null,
+          categorized: row[16] || null,
+          primaryCategory: row[17] || null,
+          timeCategory: row[18] || null,
+          seasonCategory: row[19] || null
         };
         
         results.push(photo);
@@ -339,7 +354,12 @@ function searchPhotosByRadius(centerLat, centerLng, radiusMeters, limit = 1000) 
           webViewLink: row[11],
           webContentLink: row[12],
           folderId: row[13],
-          distance: distance // Include distance in results
+          distance: distance, // Include distance in results
+          categories: row[15] ? JSON.parse(row[15]) : null,
+          categorized: row[16] || null,
+          primaryCategory: row[17] || null,
+          timeCategory: row[18] || null,
+          seasonCategory: row[19] || null
         };
         
         results.push(photo);
