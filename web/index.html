@@ -630,42 +630,7 @@
     </style>
 </head>
 <body>
-    <!-- Category Filter Modal -->
-    <div id="categoryModal" class="startup-modal hidden">
-        <div class="startup-content">
-            <h2>🏷️ Filter by Categories</h2>
-            <p>Select categories to filter your photos. Leave empty to show all photos.</p>
-            
-            <div id="categoryFilters">
-                <div class="category-section">
-                    <h4>📸 Content Categories</h4>
-                    <div id="contentCategories" class="category-checkboxes">
-                        <!-- Content categories will be populated here -->
-                    </div>
-                </div>
-                
-                <div class="category-section">
-                    <h4>🕐 Time Categories</h4>
-                    <div id="timeCategories" class="category-checkboxes">
-                        <!-- Time categories will be populated here -->
-                    </div>
-                </div>
-                
-                <div class="category-section">
-                    <h4>🌿 Season Categories</h4>
-                    <div id="seasonCategories" class="category-checkboxes">
-                        <!-- Season categories will be populated here -->
-                    </div>
-                </div>
-            </div>
-            
-            <div class="modal-buttons">
-                <button class="btn secondary" onclick="clearCategoryFilters()">Clear All</button>
-                <button class="btn secondary" onclick="closeCategoryModal()">Cancel</button>
-                <button class="btn primary" onclick="applyCategoryFilters()">Apply Filters</button>
-            </div>
-        </div>
-    </div>
+
 
     <!-- Startup Location Modal -->
     <div id="startupModal" class="startup-modal">
@@ -715,7 +680,7 @@
             <button id="refreshBtn" class="btn btn-primary">Refresh</button>
             <button id="changeLocationBtn" class="btn">📍 Change Location</button>
             <button id="viewportBtn" class="btn">🔍 Search Area</button>
-            <button id="categoriesBtn" class="btn">🏷️ Categories</button>
+
             <button id="adminBtn" class="btn">📊 Admin</button>
             <div style="position: relative;">
                 <button id="configBtn" class="btn">⚙️ Config</button>
@@ -779,12 +744,7 @@
                 folderId: '',
                 apiToken: ''
             },
-            categories: {},
-            selectedCategories: {
-                content: [],
-                time: null,
-                season: null
-            }
+
         };
 
         // Configuration management
@@ -1707,6 +1667,8 @@
                 
             } catch (error) {
                 console.error('Error loading location photos:', error);
+                console.error('Error details:', error);
+                console.error('Request URL was:', url.toString());
                 setStatus(`Error: ${error.message}`, 'error');
             } finally {
                 refreshBtn.textContent = originalText;
@@ -1860,6 +1822,8 @@
                 
             } catch (error) {
                 console.error('Error loading location photos:', error);
+                console.error('Error details:', error);
+                console.error('Request URL was:', url.toString());
                 setStatus(`Error: ${error.message}`, 'error');
             } finally {
                 locationBtn.textContent = originalText;
@@ -1908,8 +1872,7 @@
                 }
             });
             
-            // Category filter button
-            document.getElementById('categoriesBtn').addEventListener('click', toggleCategoryFilter);
+
 
             // Save config and reload photos
             document.getElementById('saveConfigBtn').addEventListener('click', () => {
@@ -2071,36 +2034,9 @@
         }
 
         // Start the application when DOM is ready
-        // Category filtering functions
-        async function toggleCategoryFilter() {
-            const modal = document.getElementById('categoryModal');
-            
-            if (modal.classList.contains('hidden')) {
-                await loadAvailableCategories();
-                modal.classList.remove('hidden');
-            } else {
-                modal.classList.add('hidden');
-            }
-        }
+
         
-        async function loadAvailableCategories() {
-            if (!APP.config.backendUrl) {
-                setStatus('Configure backend URL first', 'warning');
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${APP.config.backendUrl}?route=admin&action=get-categories${APP.config.apiToken ? `&token=${APP.config.apiToken}` : ''}`);
-                const result = await response.json();
-                
-                if (result.success) {
-                    APP.categories = result.categories;
-                    populateCategoryModal();
-                }
-            } catch (error) {
-                setStatus(`Error loading categories: ${error.message}`, 'error');
-            }
-        }
+
         
         function populateCategoryModal() {
             const contentDiv = document.getElementById('contentCategories');
@@ -2241,15 +2177,7 @@
                     url.searchParams.set('radius', APP.searchRadius.toString());
                 }
                 
-                if (APP.selectedCategories.content.length > 0) {
-                    url.searchParams.set('categories', APP.selectedCategories.content.join(','));
-                }
-                if (APP.selectedCategories.time) {
-                    url.searchParams.set('timeCategory', APP.selectedCategories.time);
-                }
-                if (APP.selectedCategories.season) {
-                    url.searchParams.set('seasonCategory', APP.selectedCategories.season);
-                }
+
                 
                 if (APP.config.folderId) url.searchParams.set('folderId', APP.config.folderId);
                 if (APP.config.apiToken) url.searchParams.set('token', APP.config.apiToken);

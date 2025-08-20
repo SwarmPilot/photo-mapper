@@ -7,7 +7,9 @@
 
 // Database configuration
 const DB_CONFIG = {
-  SPREADSHEET_ID: PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID') || '',
+  get SPREADSHEET_ID() {
+    return PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID') || '';
+  },
   PHOTOS_SHEET: 'photos',
   PROCESSING_SHEET: 'processing_log',
   CACHE_DURATION: 300, // 5 minutes
@@ -79,12 +81,7 @@ function initializePhotosSheet(spreadsheet) {
       'webContentLink', // Drive download URL
       'folderId',     // Parent folder ID
       'processed',    // Processing timestamp
-      'checksum',     // File checksum for change detection
-      'categories',   // JSON string of categorization data
-      'categorized',  // Categorization timestamp
-      'primaryCategory', // Main category for quick filtering
-      'timeCategory', // Time-based category (morning, afternoon, etc.)
-      'seasonCategory' // Season category (spring, summer, etc.)
+      'checksum'      // File checksum for change detection
     ];
     
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
@@ -261,12 +258,7 @@ function searchPhotosByBounds(north, south, east, west, limit = 1000) {
           thumbnailLink: row[10],
           webViewLink: row[11],
           webContentLink: row[12],
-          folderId: row[13],
-          categories: row[15] ? JSON.parse(row[15]) : null,
-          categorized: row[16] || null,
-          primaryCategory: row[17] || null,
-          timeCategory: row[18] || null,
-          seasonCategory: row[19] || null
+          folderId: row[13]
         };
         
         results.push(photo);
@@ -334,7 +326,7 @@ function searchPhotosByRadius(centerLat, centerLng, radiusMeters, limit = 1000) 
       if (isNaN(lat) || isNaN(lng)) continue;
       
       // Calculate distance using Haversine formula
-      const distance = calculateDistance(centerLat, centerLng, lat, lng);
+      const distance = calculateDistanceMeters(centerLat, centerLng, lat, lng);
       
       if (distance <= radiusMeters) {
         const photo = {
@@ -354,12 +346,7 @@ function searchPhotosByRadius(centerLat, centerLng, radiusMeters, limit = 1000) 
           webViewLink: row[11],
           webContentLink: row[12],
           folderId: row[13],
-          distance: distance, // Include distance in results
-          categories: row[15] ? JSON.parse(row[15]) : null,
-          categorized: row[16] || null,
-          primaryCategory: row[17] || null,
-          timeCategory: row[18] || null,
-          seasonCategory: row[19] || null
+          distance: distance // Include distance in results
         };
         
         results.push(photo);
@@ -470,4 +457,28 @@ function clearDatabaseCache() {
     console.error('Error clearing cache:', error);
     return false;
   }
+}
+
+/**
+ * Calculate distance between two GPS coordinates in meters
+ * Uses Haversine formula for accuracy
+ */
+function calculateDistanceMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = degreesToRadians(lat2 - lat1);
+  const dLng = degreesToRadians(lng2 - lng1);
+  
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(degreesToRadians(lat1)) * Math.cos(degreesToRadians(lat2)) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+            
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+/**
+ * Convert degrees to radians
+ */
+function degreesToRadians(degrees) {
+  return degrees * (Math.PI / 180);
 }

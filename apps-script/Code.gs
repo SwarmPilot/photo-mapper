@@ -28,7 +28,7 @@ const CFG = (() => {
  * Main entry point for Web App GET requests
  * Supports routes: /search, /admin, /health, and legacy /list
  */
-async function doGet(e) {
+function doGet(e) {
   try {
     // Extract parameters
     const route = (e?.parameter?.route || 'search').toString(); // Default to search now
@@ -46,8 +46,44 @@ async function doGet(e) {
         ok: true, 
         timestamp: new Date().toISOString(),
         database: !!DB_CONFIG.SPREADSHEET_ID,
+        databaseId: DB_CONFIG.SPREADSHEET_ID,
         version: '2.0.0'
       });
+    }
+    
+    if (route === 'debug') {
+      try {
+        const spreadsheetId = DB_CONFIG.SPREADSHEET_ID;
+        let debugInfo = {
+          spreadsheetId: spreadsheetId,
+          hasSpreadsheetId: !!spreadsheetId
+        };
+        
+        if (spreadsheetId) {
+          try {
+            const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+            const sheet = spreadsheet.getSheetByName(DB_CONFIG.PHOTOS_SHEET);
+            debugInfo.spreadsheetName = spreadsheet.getName();
+            debugInfo.hasPhotosSheet = !!sheet;
+            
+            if (sheet) {
+              const data = sheet.getDataRange().getValues();
+              debugInfo.totalRows = data.length;
+              debugInfo.headers = data.length > 0 ? data[0] : [];
+              debugInfo.photoCount = Math.max(0, data.length - 1);
+            }
+          } catch (sheetError) {
+            debugInfo.sheetError = sheetError.toString();
+          }
+        }
+        
+        return createJsonResponse(200, debugInfo);
+      } catch (error) {
+        return createJsonResponse(500, { 
+          error: 'Debug failed', 
+          message: error.toString() 
+        });
+      }
     }
     
     if (route === 'search') {
@@ -55,7 +91,7 @@ async function doGet(e) {
     }
     
     if (route === 'admin') {
-      return await handleAdminRequest(e.parameter);
+      return handleAdminRequest(e.parameter);
     }
     
     if (route === 'list') {
@@ -65,7 +101,7 @@ async function doGet(e) {
     }
     
     return createJsonResponse(404, { 
-      error: 'Route not found. Available routes: /search, /admin, /health' 
+      error: 'Route not found. Available routes: /search, /admin, /health, /debug' 
     });
     
   } catch (error) {
@@ -131,11 +167,25 @@ function handleListPhotos(folderId, parameters = {}) {
  */
 function handleDatabaseSearch(parameters = {}) {
   try {
+    console.log('handleDatabaseSearch called with parameters:', parameters);
+    console.log('Current DB_CONFIG.SPREADSHEET_ID:', DB_CONFIG.SPREADSHEET_ID);
+    
     // Initialize database if needed
     if (!DB_CONFIG.SPREADSHEET_ID) {
       console.log('Database not initialized, initializing now...');
-      const initResult = initializeDatabase();
-      console.log('Database initialized:', initResult);
+      try {
+        const initResult = initializeDatabase();
+        console.log('Database initialized:', initResult);
+        console.log('DB_CONFIG.SPREADSHEET_ID after init:', DB_CONFIG.SPREADSHEET_ID);
+      } catch (initError) {
+        console.error('Database initialization failed:', initError);
+        throw new Error(`Database initialization failed: ${initError.message}. Please run the admin setup first.`);
+      }
+    }
+    
+    // Verify database is available
+    if (!DB_CONFIG.SPREADSHEET_ID) {
+      throw new Error('Database not available. Please use the admin panel to initialize the database first.');
     }
     
     // Parse search parameters
@@ -144,21 +194,28 @@ function handleDatabaseSearch(parameters = {}) {
     let results = [];
     let searchType = 'unknown';
     
+    console.log('Search type determined:', searchParams.type);
+    
     if (searchParams.type === 'bbox' || searchParams.type === 'viewport') {
       const bounds = searchParams.bounds;
+      console.log('Searching by bounds:', bounds);
       results = searchPhotosByBounds(bounds.north, bounds.south, bounds.east, bounds.west, searchParams.limit);
       searchType = 'bounding_box';
       
     } else if (searchParams.type === 'radius') {
       const center = searchParams.center;
+      console.log('Searching by radius:', center, searchParams.radius);
       results = searchPhotosByRadius(center.latitude, center.longitude, searchParams.radius, searchParams.limit);
       searchType = 'radius';
       
     } else {
       // Default to all photos (with limit)
+      console.log('Getting all photos with limit:', searchParams.limit);
       results = getAllPhotosFromDatabase(searchParams.limit);
       searchType = 'all';
     }
+    
+    console.log('Search results count:', results.length);
     
     const responseData = {
       count: results.length,
@@ -185,7 +242,7 @@ function handleDatabaseSearch(parameters = {}) {
 /**
  * Handles admin requests for database management
  */
-async function handleAdminRequest(parameters = {}) {
+function handleAdminRequest(parameters = {}) {
   try {
     const action = (parameters.action || '').toString();
     const folderId = (parameters.folderId || CFG.FOLDER_ID).toString();
@@ -270,19 +327,15 @@ async function handleAdminRequest(parameters = {}) {
       case 'cleanup-no-gps':
         return handleCleanupNoGpsImages(parameters, folderId);
         
-      case 'categorize-photos':
-        return await handleCategorizePhotos(parameters, folderId);
-        
-      case 'get-categories':
-        return handleGetCategories();
+
         
       default:
         return createJsonResponse(400, { 
           error: 'Invalid admin action',
-          available: [
-            'init', 'process', 'reprocess', 'incremental', 'cleanup', 'stats', 'clear-cache', 
-            'setup-automation', 'test-automation', 'clear-automation', 'health-check', 
-            'set-notification-email', 'status', 'cleanup-no-gps', 'categorize-photos', 'get-categories'
+                    available: [
+            'init', 'process', 'reprocess', 'incremental', 'cleanup', 'stats', 'clear-cache',
+            'setup-automation', 'test-automation', 'clear-automation', 'health-check',
+            'set-notification-email', 'status', 'cleanup-no-gps'
           ]
         });
     }
@@ -700,228 +753,13 @@ function getNoGpsReason(file) {
   return 'Unknown reason';
 }
 
-/**
- * Handles photo categorization requests
- */
-async function handleCategorizePhotos(parameters = {}, folderId) {
-  try {
-    const mode = (parameters.mode || 'preview').toString();
-    const batchSize = parseInt(parameters.batchSize || '20');
-    const maxPhotos = parseInt(parameters.maxPhotos || '100');
-    const recategorize = (parameters.recategorize || 'false').toString() === 'true';
-    
-    console.log(`Starting photo categorization - Mode: ${mode}, BatchSize: ${batchSize}, Max: ${maxPhotos}`);
-    
-    if (!folderId) {
-      return createJsonResponse(400, { error: 'Folder ID is required for categorization' });
-    }
-    
-    // Get photos to categorize
-    const photos = getPhotosForCategorization(folderId, maxPhotos, recategorize);
-    
-    if (photos.length === 0) {
-      return createJsonResponse(200, {
-        success: true,
-        mode: mode,
-        summary: {
-          totalFound: 0,
-          alreadyCategorized: 0,
-          processed: 0,
-          errors: 0
-        },
-        message: 'No photos found that need categorization'
-      });
-    }
-    
-    if (mode === 'preview') {
-      // Just return what would be processed
-      return createJsonResponse(200, {
-        success: true,
-        mode: 'preview',
-        summary: {
-          totalFound: photos.length,
-          wouldProcess: Math.min(photos.length, maxPhotos),
-          batchSize: batchSize
-        },
-        samplePhotos: photos.slice(0, 10).map(p => ({
-          id: p.id,
-          name: p.name,
-          currentCategory: p.primaryCategory || 'none'
-        }))
-      });
-    }
-    
-    // Actually categorize photos
-    const results = await processCategorization(photos.slice(0, maxPhotos), batchSize);
-    
-    return createJsonResponse(200, {
-      success: true,
-      mode: 'execute',
-      summary: results.summary,
-      processed: results.processed,
-      errors: results.errors,
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('Photo categorization error:', error);
-    return createJsonResponse(500, { 
-      error: 'Photo categorization failed',
-      message: error.toString()
-    });
-  }
-}
 
-/**
- * Gets photos that need categorization
- */
-function getPhotosForCategorization(folderId, maxPhotos, recategorize = false) {
-  try {
-    // Get photos from database
-    const photos = getAllPhotosFromDatabase();
-    
-    if (recategorize) {
-      // Return all photos for re-categorization
-      return photos.slice(0, maxPhotos);
-    } else {
-      // Return only uncategorized photos
-      return photos.filter(photo => !photo.categorized || !photo.primaryCategory).slice(0, maxPhotos);
-    }
-    
-  } catch (error) {
-    console.error('Error getting photos for categorization:', error);
-    return [];
-  }
-}
 
-/**
- * Processes photo categorization in batches
- */
-async function processCategorization(photos, batchSize) {
-  const results = {
-    summary: {
-      totalPhotos: photos.length,
-      processed: 0,
-      categorized: 0,
-      errors: 0,
-      startTime: new Date().toISOString()
-    },
-    processed: [],
-    errors: []
-  };
-  
-  try {
-    for (let i = 0; i < photos.length; i += batchSize) {
-      const batch = photos.slice(i, i + batchSize);
-      
-      console.log(`Processing categorization batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(photos.length/batchSize)}`);
-      
-      for (const photo of batch) {
-        try {
-          console.log(`Processing photo: ${photo?.name || 'unnamed'} (ID: ${photo?.id || 'no-id'})`);
-          
-          // Categorize the photo
-          const categories = await categorizePhoto(photo);
-          
-          // Ensure categories has the expected structure
-          if (!categories || typeof categories !== 'object') {
-            throw new Error('Invalid categorization result');
-          }
-          
-          // Ensure primary array exists
-          if (!Array.isArray(categories.primary)) {
-            categories.primary = ['uncategorized'];
-          }
-          
-          // Update photo in database with categorization
-          const updatedPhoto = {
-            ...photo,
-            categories: categories,
-            categorized: new Date().toISOString(),
-            primaryCategory: categories.primary[0] || 'uncategorized',
-            timeCategory: categories.time || null,
-            seasonCategory: categories.season || null
-          };
-          
-          // Store in database
-          storePhotoMetadata(updatedPhoto);
-          
-          results.processed.push({
-            id: photo.id,
-            name: photo.name,
-            primaryCategory: updatedPhoto.primaryCategory,
-            categories: categories
-          });
-          
-          results.summary.processed++;
-          results.summary.categorized++;
-          
-        } catch (error) {
-          console.error(`Failed to categorize photo ${photo.name}:`, error);
-          results.errors.push({
-            photoId: photo.id,
-            photoName: photo.name,
-            error: error.toString()
-          });
-          results.summary.errors++;
-        }
-        
-        // Small delay to avoid overwhelming the system
-        Utilities.sleep(100);
-      }
-      
-      // Longer pause between batches
-      if (i + batchSize < photos.length) {
-        Utilities.sleep(500);
-      }
-    }
-    
-    results.summary.endTime = new Date().toISOString();
-    const duration = new Date(results.summary.endTime).getTime() - new Date(results.summary.startTime).getTime();
-    results.summary.durationMs = duration;
-    
-    console.log(`Categorization completed: ${results.summary.categorized}/${results.summary.totalPhotos} photos categorized`);
-    
-    return results;
-    
-  } catch (error) {
-    console.error('Batch categorization error:', error);
-    results.errors.push({
-      batch: true,
-      error: error.toString()
-    });
-    return results;
-  }
-}
 
-/**
- * Returns available categories and their configuration
- */
-function handleGetCategories() {
-  try {
-    const categories = getAllCategories();
-    
-    return createJsonResponse(200, {
-      success: true,
-      categories: categories,
-      config: {
-        enableVisionAPI: CATEGORY_CONFIG.enableVisionAPI,
-        enableLocationContext: CATEGORY_CONFIG.enableLocationContext,
-        enableMetadataAnalysis: CATEGORY_CONFIG.enableMetadataAnalysis,
-        enableTimeAnalysis: CATEGORY_CONFIG.enableTimeAnalysis,
-        minimumConfidence: CATEGORY_CONFIG.minimumConfidence
-      },
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('Get categories error:', error);
-    return createJsonResponse(500, { 
-      error: 'Failed to get categories',
-      message: error.toString()
-    });
-  }
-}
+
+
+
+
 
 /**
  * Generates reliable photo URLs with fallbacks for thumbnails and links
@@ -994,10 +832,7 @@ function parseSearchParameters(parameters) {
     bounds: null,
     center: null,
     radius: null,
-    limit: null,
-    categories: null, // Category filtering
-    timeCategory: null, // Time-based filtering
-    seasonCategory: null // Season-based filtering
+    limit: null
   };
   
   // Bounding box search: ?bbox=north,south,east,west
@@ -1035,20 +870,7 @@ function parseSearchParameters(parameters) {
     };
   }
   
-  // Category filtering: ?categories=nature,urban,people
-  if (parameters.categories) {
-    params.categories = parameters.categories.toString().split(',').map(c => c.trim());
-  }
-  
-  // Time category filtering: ?timeCategory=morning
-  if (parameters.timeCategory) {
-    params.timeCategory = parameters.timeCategory.toString();
-  }
-  
-  // Season category filtering: ?seasonCategory=summer
-  if (parameters.seasonCategory) {
-    params.seasonCategory = parameters.seasonCategory.toString();
-  }
+
   
   // Optional result limit (cap at max for performance)
   if (parameters.limit) {
@@ -1076,18 +898,7 @@ function createSearchCacheKey(folderId, searchParams) {
     key += ':all';
   }
   
-  // Add category filters to cache key
-  if (searchParams.categories && searchParams.categories.length > 0) {
-    key += `:cat:${searchParams.categories.sort().join(',')}`;
-  }
-  
-  if (searchParams.timeCategory) {
-    key += `:time:${searchParams.timeCategory}`;
-  }
-  
-  if (searchParams.seasonCategory) {
-    key += `:season:${searchParams.seasonCategory}`;
-  }
+
   
   return key;
 }
@@ -1099,9 +910,7 @@ function filterPhotosByLocation(photos, searchParams) {
   // First apply category filters if specified
   let filteredPhotos = photos;
   
-  if (searchParams.categories || searchParams.timeCategory || searchParams.seasonCategory) {
-    filteredPhotos = filterPhotosByCategories(photos, searchParams);
-  }
+
   
   if (searchParams.type === 'all') {
     return searchParams.limit ? filteredPhotos.slice(0, searchParams.limit) : filteredPhotos;
@@ -1148,33 +957,7 @@ function filterPhotosByLocation(photos, searchParams) {
   return filtered;
 }
 
-/**
- * Filter photos by category criteria
- */
-function filterPhotosByCategories(photos, searchParams) {
-  return photos.filter(photo => {
-    // Check primary categories
-    if (searchParams.categories && searchParams.categories.length > 0) {
-      const photoCategories = photo.categories?.primary || [];
-      const hasMatchingCategory = searchParams.categories.some(searchCat => 
-        photoCategories.includes(searchCat) || photo.primaryCategory === searchCat
-      );
-      if (!hasMatchingCategory) return false;
-    }
-    
-    // Check time category
-    if (searchParams.timeCategory) {
-      if (photo.timeCategory !== searchParams.timeCategory) return false;
-    }
-    
-    // Check season category
-    if (searchParams.seasonCategory) {
-      if (photo.seasonCategory !== searchParams.seasonCategory) return false;
-    }
-    
-    return true;
-  });
-}
+
 
 /**
  * Calculate distance between two GPS coordinates in meters
